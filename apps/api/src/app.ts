@@ -8,14 +8,17 @@ import Fastify, {
 } from 'fastify';
 
 import type { Environment } from './config/environment.js';
+import type { Database } from './infrastructure/database.js';
 import { healthRoutes } from './routes/health.js';
 
 interface BuildAppOptions {
+  database: Database;
   environment: Environment;
   logger?: FastifyServerOptions['logger'];
 }
 
 export async function buildApp({
+  database,
   environment,
   logger = false,
 }: BuildAppOptions): Promise<FastifyInstance> {
@@ -25,7 +28,7 @@ export async function buildApp({
       disableRequestLogging: environment.NODE_ENV === 'test',
     }),
     logger,
-    trustProxy: false,
+    trustProxy: environment.TRUST_PROXY,
   });
 
   await app.register(helmet, {
@@ -35,7 +38,11 @@ export async function buildApp({
     credentials: true,
     origin: environment.WEB_ORIGIN,
   });
-  await app.register(healthRoutes, { prefix: '/api' });
+  await app.register(healthRoutes, { database, prefix: '/api' });
+
+  app.addHook('onClose', async () => {
+    await database.close();
+  });
 
   app.setErrorHandler(
     async (error: FastifyError, request, reply): Promise<void> => {

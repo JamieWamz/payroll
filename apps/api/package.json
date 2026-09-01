@@ -11,7 +11,10 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
-    "dev": "tsx watch src/server.ts",
+    "db:migrate": "node --env-file-if-exists=../../.env ../../node_modules/node-pg-migrate/bin/node-pg-migrate.js up --database-url-var DATABASE_MIGRATION_URL --migrations-dir migrations --migrations-schema zampayroll_internal --create-migrations-schema --migrations-table schema_migrations --check-order --single-transaction --advisory-lock-mode fail",
+    "db:migrate:create": "node --env-file-if-exists=../../.env ../../node_modules/node-pg-migrate/bin/node-pg-migrate.js create --migrations-dir migrations --migration-file-language sql --migration-filename-format utc",
+    "db:migrate:down": "node --env-file-if-exists=../../.env ../../node_modules/node-pg-migrate/bin/node-pg-migrate.js down --database-url-var DATABASE_MIGRATION_URL --migrations-dir migrations --migrations-schema zampayroll_internal --create-migrations-schema --migrations-table schema_migrations --check-order --single-transaction --advisory-lock-mode fail",
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/server.ts",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -21,10 +24,13 @@
     "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.1",
     "fastify": "5.12.1",
+    "pg": "8.23.0",
     "pino": "10.3.1",
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@types/pg": "8.23.1",
+    "node-pg-migrate": "9.0.0",
     "tsx": "4.23.13"
   }
 }

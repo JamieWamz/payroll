@@ -1,0 +1,37 @@
+-- Up Migration
+
+CREATE SCHEMA app AUTHORIZATION zampayroll_migrator;
+
+REVOKE ALL ON SCHEMA app FROM PUBLIC;
+GRANT USAGE ON SCHEMA app TO zampayroll_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE zampayroll_migrator IN SCHEMA app
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO zampayroll_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE zampayroll_migrator IN SCHEMA app
+  GRANT USAGE, SELECT ON SEQUENCES TO zampayroll_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE zampayroll_migrator IN SCHEMA app
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE zampayroll_migrator IN SCHEMA app
+  GRANT EXECUTE ON FUNCTIONS TO zampayroll_app;
+
+COMMENT ON SCHEMA app IS
+  'Version-controlled ZamPayroll application objects. No payroll domain tables exist in Phase 1.';
+
+-- Down Migration
+
+ALTER DEFAULT PRIVILEGES FOR ROLE zampayroll_migrator IN SCHEMA app
+  REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM zampayroll_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE zampayroll_migrator IN SCHEMA app
+  REVOKE USAGE, SELECT ON SEQUENCES FROM zampayroll_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE zampayroll_migrator IN SCHEMA app
+  REVOKE EXECUTE ON FUNCTIONS FROM zampayroll_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE zampayroll_migrator IN SCHEMA app
+  GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
+
+DROP SCHEMA app;

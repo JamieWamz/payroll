@@ -1,0 +1,135 @@
+name: zampayroll
+
+services:
+  postgres:
+    image: postgres:18.4-bookworm
+    restart: unless-stopped
+    environment:
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD:?MIGRATION_DB_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-zampayroll}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C.UTF-8 --auth-host=scram-sha-256
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_USER: ${POSTGRES_USER:-zampayroll_admin}
+      TZ: UTC
+    command:
+      - postgres
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - timezone=UTC
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          PGPASSWORD="$${POSTGRES_PASSWORD}" psql
+          --host=127.0.0.1
+          --username="$${POSTGRES_USER}"
+          --dbname="$${POSTGRES_DB}"
+          --no-password
+          --tuples-only
+          --no-align
+          --command="SELECT (count(*) = 2)::int FROM pg_roles WHERE rolname IN ('zampayroll_migrator', 'zampayroll_app')"
+          | grep --quiet --line-regexp 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    shm_size: 128mb
+    stop_grace_period: 30s
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - database
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_MIGRATION_URL: ${COMPOSE_DATABASE_MIGRATION_URL:?COMPOSE_DATABASE_MIGRATION_URL is required}
+      NPM_CONFIG_CACHE: /tmp/.npm
+      TZ: UTC
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: 'no'
+    networks:
+      - database
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: api
+    restart: unless-stopped
+    environment:
+      DATABASE_CONNECTION_TIMEOUT_MS: ${DATABASE_CONNECTION_TIMEOUT_MS:-5000}
+      DATABASE_IDLE_TIMEOUT_MS: ${DATABASE_IDLE_TIMEOUT_MS:-30000}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
+      DATABASE_STATEMENT_TIMEOUT_MS: ${DATABASE_STATEMENT_TIMEOUT_MS:-5000}
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:?COMPOSE_DATABASE_URL is required}
+      HOST: 0.0.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: production
+      PORT: 3000
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      TZ: UTC
+      WEB_ORIGIN: ${COMPOSE_WEB_ORIGIN:-http://127.0.0.1:8080}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - 127.0.0.1:${API_PORT:-3000}:3000
+    networks:
+      - database
+      - edge
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:uid=101,gid=101,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - 127.0.0.1:${WEB_PORT:-8080}:8080
+    networks:
+      - edge
+
+volumes:
+  postgres_data:
+
+networks:
+  database:
+    internal: true
+  edge:
