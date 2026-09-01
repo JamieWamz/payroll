@@ -1,0 +1,273 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify and smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      CI_COMPOSE_PROJECT: zampayroll-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      CI_ENV_FILE: /tmp/zampayroll-ci-${{ github.run_id }}-${{ github.run_attempt }}.env
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Set up pinned npm
+        run: |
+          set -Eeuo pipefail
+          npm install --global npm@11.16.0 --ignore-scripts
+          test "$(node --version | cut -d. -f1)" = 'v24'
+          test "$(npm --version)" = '11.16.0'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check workspaces
+        run: npm run typecheck
+
+      - name: Run workspace unit tests
+        run: npm test
+
+      - name: Build workspaces
+        run: npm run build
+
+      - name: Create isolated Compose environment
+        run: |
+          set -Eeuo pipefail
+          umask 077
+
+          admin_password="$(openssl rand -hex 32)"
+          migration_password="$(openssl rand -hex 32)"
+          app_password="$(openssl rand -hex 32)"
+
+          printf '::add-mask::%s\n' "$admin_password"
+          printf '::add-mask::%s\n' "$migration_password"
+          printf '::add-mask::%s\n' "$app_password"
+
+          {
+            printf 'APP_DB_PASSWORD=%s\n' "$app_password"
+            printf 'MIGRATION_DB_PASSWORD=%s\n' "$migration_password"
+            printf 'POSTGRES_DB=zampayroll_ci\n'
+            printf 'POSTGRES_PASSWORD=%s\n' "$admin_password"
+            printf 'POSTGRES_USER=zampayroll_admin\n'
+            printf 'POSTGRES_PORT=0\n'
+            printf 'API_PORT=0\n'
+            printf 'WEB_PORT=0\n'
+            printf 'COMPOSE_WEB_ORIGIN=http://127.0.0.1\n'
+            printf 'COMPOSE_DATABASE_MIGRATION_URL=postgresql://zampayroll_migrator:%s@postgres:5432/zampayroll_ci\n' "$migration_password"
+            printf 'COMPOSE_DATABASE_URL=postgresql://zampayroll_app:%s@postgres:5432/zampayroll_ci\n' "$app_password"
+            printf 'DATABASE_SSL=false\n'
+            printf 'LOG_LEVEL=info\n'
+            printf 'TRUST_PROXY=false\n'
+          } >"$CI_ENV_FILE"
+
+      - name: Validate Compose configurations
+        run: |
+          set -Eeuo pipefail
+          docker compose \
+            --project-name "$CI_COMPOSE_PROJECT" \
+            --env-file "$CI_ENV_FILE" \
+            --file compose.yaml \
+            config --quiet
+          docker compose \
+            --project-name "$CI_COMPOSE_PROJECT" \
+            --env-file "$CI_ENV_FILE" \
+            --file compose.yaml \
+            --file compose.dev.yaml \
+            config --quiet
+
+      - name: Build production images
+        run: |
+          set -Eeuo pipefail
+          docker compose \
+            --project-name "$CI_COMPOSE_PROJECT" \
+            --env-file "$CI_ENV_FILE" \
+            --file compose.yaml \
+            --file compose.dev.yaml \
+            build --pull migrate api web
+
+      - name: Initialize PostgreSQL
+        run: |
+          set -Eeuo pipefail
+
+          compose=(
+            docker compose
+            --project-name "$CI_COMPOSE_PROJECT"
+            --env-file "$CI_ENV_FILE"
+            --file compose.yaml
+            --file compose.dev.yaml
+          )
+
+          "${compose[@]}" pull postgres
+          "${compose[@]}" up --detach --no-build postgres
+
+          container_id="$("${compose[@]}" ps --quiet postgres)"
+          test -n "$container_id"
+
+          for attempt in {1..60}; do
+            health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+            if [[ "$health" == 'healthy' ]]; then
+              exit 0
+            fi
+            if [[ "$health" == 'unhealthy' || "$health" == 'exited' || "$health" == 'dead' ]]; then
+              break
+            fi
+            sleep 2
+          done
+
+          "${compose[@]}" logs --no-color postgres
+          exit 1
+
+      - name: Run database migrations
+        run: |
+          set -Eeuo pipefail
+          docker compose \
+            --project-name "$CI_COMPOSE_PROJECT" \
+            --env-file "$CI_ENV_FILE" \
+            --file compose.yaml \
+            --file compose.dev.yaml \
+            up --no-deps --no-build --exit-code-from migrate migrate
+
+      - name: Run PostgreSQL integration tests
+        run: |
+          set -Eeuo pipefail
+
+          compose=(
+            docker compose
+            --project-name "$CI_COMPOSE_PROJECT"
+            --env-file "$CI_ENV_FILE"
+            --file compose.yaml
+            --file compose.dev.yaml
+          )
+
+          postgres_endpoint="$("${compose[@]}" port postgres 5432)"
+          postgres_port="${postgres_endpoint##*:}"
+          if [[ ! "$postgres_port" =~ ^[0-9]+$ ]]; then
+            printf 'Unable to determine the PostgreSQL test port.\n' >&2
+            exit 1
+          fi
+
+          # The generated file contains only CI-owned, URL-safe values.
+          source "$CI_ENV_FILE"
+          TEST_DATABASE_URL="postgresql://zampayroll_app:${APP_DB_PASSWORD}@127.0.0.1:${postgres_port}/${POSTGRES_DB}" \
+            npm run test --workspace @zampayroll/api -- database.integration.test.ts
+
+      - name: Start production stack
+        run: |
+          set -Eeuo pipefail
+          docker compose \
+            --project-name "$CI_COMPOSE_PROJECT" \
+            --env-file "$CI_ENV_FILE" \
+            --file compose.yaml \
+            --file compose.dev.yaml \
+            up --detach --no-build api web
+
+      - name: Smoke-test healthy API and web containers
+        run: |
+          set -Eeuo pipefail
+
+          compose=(
+            docker compose
+            --project-name "$CI_COMPOSE_PROJECT"
+            --env-file "$CI_ENV_FILE"
+            --file compose.yaml
+            --file compose.dev.yaml
+          )
+
+          wait_for_health() {
+            local service="$1"
+            local container_id
+            local health
+
+            container_id="$("${compose[@]}" ps --quiet "$service")"
+            test -n "$container_id"
+
+            for attempt in {1..60}; do
+              health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+              if [[ "$health" == 'healthy' ]]; then
+                return 0
+              fi
+              if [[ "$health" == 'unhealthy' || "$health" == 'exited' || "$health" == 'dead' ]]; then
+                break
+              fi
+              sleep 2
+            done
+
+            "${compose[@]}" logs --no-color "$service"
+            return 1
+          }
+
+          wait_for_http() {
+            local url="$1"
+
+            for attempt in {1..30}; do
+              if curl --fail --silent --show-error --max-time 3 "$url" >/dev/null; then
+                return 0
+              fi
+              sleep 2
+            done
+
+            return 1
+          }
+
+          wait_for_health api
+          wait_for_health web
+
+          api_endpoint="$("${compose[@]}" port api 3000)"
+          web_endpoint="$("${compose[@]}" port web 8080)"
+
+          wait_for_http "http://${api_endpoint}/api/health/live"
+          wait_for_http "http://${api_endpoint}/api/health/ready"
+          wait_for_http "http://${web_endpoint}/health"
+          wait_for_http "http://${web_endpoint}/"
+          wait_for_http "http://${web_endpoint}/api/health/ready"
+
+      - name: Tear down isolated Compose environment
+        if: always()
+        run: |
+          set -Eeuo pipefail
+          cleanup_status=0
+          if [[ -f "$CI_ENV_FILE" ]]; then
+            docker compose \
+              --project-name "$CI_COMPOSE_PROJECT" \
+              --env-file "$CI_ENV_FILE" \
+              --file compose.yaml \
+              --file compose.dev.yaml \
+              down --volumes --remove-orphans || cleanup_status=$?
+            rm --force -- "$CI_ENV_FILE"
+          fi
+          exit "$cleanup_status"
