@@ -1,10 +1,11 @@
 # ZamPayroll
 
-ZamPayroll is the foundation for a Zambia-specific payroll SaaS for SMEs and
-accounting firms.
+ZamPayroll is a Zambia-specific payroll SaaS under active development for SMEs
+and accounting firms.
 
 > [!WARNING]
-> This repository is at **Phase 1: repository foundation**. It does not yet
+> **Phase 1 is complete and Phase 2 domain work is in progress.** The system
+> does not yet
 > implement payroll calculations, PAYE, NAPSA, NHIMA, payslips, statutory
 > reports, authentication, or employee/company records. No statutory rate in
 > this repository should be inferred or used for real payroll. The current
@@ -26,6 +27,11 @@ accounting firms.
 The architecture and controls planned for later payroll work are documented in
 [docs/architecture.md](docs/architecture.md). They are future design
 constraints, not implemented features.
+
+The accepted Phase 2 sequencing and security boundary is recorded in
+[ADR 0001](docs/decisions/0001-phase-2-domain-boundaries.md). In particular,
+business CRUD will not be exposed through temporary identity headers or other
+insecure development shortcuts.
 
 ## Technology
 

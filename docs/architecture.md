@@ -2,15 +2,33 @@
 
 ## Status and scope
 
-This document distinguishes the current Phase 1 repository foundation from
-future payroll architecture. Sections marked **Future** describe constraints
-for later phases; they do not claim that a feature, domain model, statutory
-rule, or security control has been implemented.
+This document distinguishes the completed Phase 1 repository foundation and
+the current Phase 2 domain work from future payroll architecture. Sections
+marked **Future** describe constraints for later phases; they do not claim that
+a feature, domain model, statutory rule, or security control has been
+implemented.
 
 > [!IMPORTANT]
 > There is no payroll engine or statutory calculation in Phase 1. PAYE, NAPSA,
 > NHIMA, payslips, employees, companies, authentication, authorization, and
 > finalized payroll runs are not implemented.
+
+The sequencing and security decisions for Phase 2 are recorded in
+[ADR 0001](decisions/0001-phase-2-domain-boundaries.md).
+
+## Current Phase 2 boundary
+
+Phase 2 begins with framework-independent value objects and an immutable
+payroll-calculation contract. The contract defines the evidence a future
+calculator must receive and return; it is not a calculator implementation.
+There are no statutory constants, default rounding behavior, calculate route,
+or finalization route.
+
+Business HTTP routes remain closed until server-side authentication, CSRF
+protection, current company membership, RBAC, tenant context, and append-only
+audit are implemented and tested. Client-provided user or company headers are
+not an authentication mechanism and will not be introduced as a temporary
+shortcut.
 
 ## Current system
 
