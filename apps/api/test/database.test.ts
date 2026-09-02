@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loadEnvironment } from '../src/config/environment.js';
 import { createPostgresDatabase } from '../src/infrastructure/database.js';
+import { parseEntityId } from '../src/shared/domain/entity-id.js';
 
 const poolMocks = vi.hoisted(() => ({
   configurations: [] as unknown[],
@@ -39,6 +40,11 @@ const environment = loadEnvironment({
   DATABASE_URL: 'postgresql://app:test@localhost:5432/zampayroll',
   NODE_ENV: 'test',
 });
+
+const companyId = parseEntityId(
+  '7F3D33F7-3B84-4BB6-929C-7BA701D17891',
+  'Company',
+);
 
 beforeEach(() => {
   poolMocks.configurations.length = 0;
@@ -126,5 +132,138 @@ describe('PostgreSQL database adapter', () => {
     await database.close();
 
     expect(poolMocks.end).toHaveBeenCalledOnce();
+  });
+
+  it('runs tenant work on one client with transaction-local parameterized context', async () => {
+    const query = vi.fn().mockResolvedValue({ rowCount: 1, rows: [] });
+    const release = vi.fn();
+    poolMocks.connect.mockResolvedValue({ query, release });
+    const database = createPostgresDatabase(environment);
+    const employeeId = 'd14f42c4-b9eb-43da-bb2a-d77e26c55916';
+
+    const result = await database.withTenantTransaction(
+      companyId,
+      async (transaction) => {
+        await transaction.query(
+          'SELECT employee_id FROM app.employee WHERE employee_id = $1',
+          [employeeId],
+        );
+        return { employeeId };
+      },
+    );
+
+    expect(result).toEqual({ employeeId });
+    expect(poolMocks.connect).toHaveBeenCalledOnce();
+    expect(query.mock.calls).toEqual([
+      ['BEGIN'],
+      [
+        expect.stringContaining(
+          "pg_catalog.set_config('app.current_company_id', $1, true)",
+        ),
+        [companyId],
+      ],
+      [
+        'SELECT employee_id FROM app.employee WHERE employee_id = $1',
+        [employeeId],
+      ],
+      ['COMMIT'],
+    ]);
+    expect(query.mock.calls.flat().join(' ')).not.toContain(
+      `SET app.current_company_id = '${companyId}'`,
+    );
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('rolls back callback failures and always releases the client', async () => {
+    const query = vi.fn().mockResolvedValue({ rowCount: null, rows: [] });
+    const release = vi.fn();
+    poolMocks.connect.mockResolvedValue({ query, release });
+    const database = createPostgresDatabase(environment);
+    const operationError = new Error('employee write failed');
+
+    await expect(
+      database.withTenantTransaction(companyId, async () => {
+        throw operationError;
+      }),
+    ).rejects.toBe(operationError);
+
+    expect(query.mock.calls).toEqual([
+      ['BEGIN'],
+      [
+        expect.stringContaining(
+          "pg_catalog.set_config('app.current_company_id', $1, true)",
+        ),
+        [companyId],
+      ],
+      ['ROLLBACK'],
+    ]);
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('preserves the original failure when rollback also fails', async () => {
+    const operationError = new Error('domain operation failed');
+    const rollbackError = new Error('connection lost during rollback');
+    const query = vi.fn(async (text: string) => {
+      if (text === 'ROLLBACK') {
+        throw rollbackError;
+      }
+
+      return { rowCount: null, rows: [] };
+    });
+    const release = vi.fn();
+    poolMocks.connect.mockResolvedValue({ query, release });
+    const database = createPostgresDatabase(environment);
+
+    await expect(
+      database.withTenantTransaction(companyId, async () => {
+        throw operationError;
+      }),
+    ).rejects.toBe(operationError);
+
+    expect(query).toHaveBeenLastCalledWith('ROLLBACK');
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('rolls back a failed commit before releasing the client', async () => {
+    const commitError = new Error('commit failed');
+    const query = vi.fn(async (text: string) => {
+      if (text === 'COMMIT') {
+        throw commitError;
+      }
+
+      return { rowCount: null, rows: [] };
+    });
+    const release = vi.fn();
+    poolMocks.connect.mockResolvedValue({ query, release });
+    const database = createPostgresDatabase(environment);
+
+    await expect(
+      database.withTenantTransaction(companyId, async () => 'completed'),
+    ).rejects.toBe(commitError);
+
+    expect(query.mock.calls.at(-2)).toEqual(['COMMIT']);
+    expect(query.mock.calls.at(-1)).toEqual(['ROLLBACK']);
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('does not allow retained transaction handles to query after completion', async () => {
+    const query = vi.fn().mockResolvedValue({ rowCount: null, rows: [] });
+    const release = vi.fn();
+    poolMocks.connect.mockResolvedValue({ query, release });
+    const database = createPostgresDatabase(environment);
+    let retainedTransaction:
+      | Parameters<Parameters<typeof database.withTenantTransaction>[1]>[0]
+      | undefined;
+
+    await database.withTenantTransaction(companyId, async (transaction) => {
+      retainedTransaction = transaction;
+    });
+
+    const callsAfterCompletion = query.mock.calls.length;
+    await expect(retainedTransaction?.query('SELECT 1')).rejects.toThrow(
+      'Tenant transaction is no longer active',
+    );
+    expect(query).toHaveBeenCalledTimes(callsAfterCompletion);
+    expect(release).toHaveBeenCalledOnce();
   });
 });

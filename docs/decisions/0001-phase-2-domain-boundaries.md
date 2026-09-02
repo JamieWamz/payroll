@@ -68,6 +68,13 @@ ZamPayroll will use these boundaries:
 Each junction includes its own migrations where applicable, validation,
 automated tests, security review, documentation, commit, and push.
 
+## Implementation status
+
+Steps 1 and 2 are implemented. The company and identity tables are internal:
+there are no registration, login, company, membership, or role routes. Step 3,
+including server-side sessions and append-only audit, is the next security
+boundary before authorized business behavior can be exposed.
+
 ## Consequences
 
 The first Phase 2 commits add internal contracts before visible CRUD. This is

@@ -1,10 +1,23 @@
 import { Pool } from 'pg';
+import type { QueryResult, QueryResultRow } from 'pg';
 
 import type { Environment } from '../config/environment.js';
+import type { EntityId } from '../shared/domain/entity-id.js';
+
+export interface TenantTransaction {
+  query<Row extends QueryResultRow = QueryResultRow>(
+    text: string,
+    values?: readonly unknown[],
+  ): Promise<QueryResult<Row>>;
+}
 
 export interface Database {
   checkHealth(): Promise<void>;
   close(): Promise<void>;
+  withTenantTransaction<Result>(
+    companyId: EntityId<'Company'>,
+    operation: (transaction: TenantTransaction) => Promise<Result>,
+  ): Promise<Result>;
 }
 
 export interface DatabaseOperationalEvent {
@@ -33,6 +46,10 @@ const readinessQuery = `
         'USAGE'
       )
   ) AS ready
+`;
+
+const setTenantContextQuery = `
+  SELECT pg_catalog.set_config('app.current_company_id', $1, true)
 `;
 
 export function createPostgresDatabase(
@@ -78,6 +95,57 @@ export function createPostgresDatabase(
     async close(): Promise<void> {
       closePromise ??= pool.end();
       await closePromise;
+    },
+    async withTenantTransaction<Result>(
+      companyId: EntityId<'Company'>,
+      operation: (transaction: TenantTransaction) => Promise<Result>,
+    ): Promise<Result> {
+      const client = await pool.connect();
+      let active = true;
+      let transactionStarted = false;
+
+      const transaction: TenantTransaction = {
+        async query<Row extends QueryResultRow = QueryResultRow>(
+          text: string,
+          values?: readonly unknown[],
+        ): Promise<QueryResult<Row>> {
+          if (!active) {
+            throw new Error('Tenant transaction is no longer active');
+          }
+
+          return client.query<Row>(
+            text,
+            values === undefined ? undefined : [...values],
+          );
+        },
+      };
+
+      try {
+        await client.query('BEGIN');
+        transactionStarted = true;
+        await client.query(setTenantContextQuery, [companyId]);
+
+        const result = await operation(transaction);
+        active = false;
+        await client.query('COMMIT');
+
+        return result;
+      } catch (error) {
+        active = false;
+
+        if (transactionStarted) {
+          try {
+            await client.query('ROLLBACK');
+          } catch {
+            // Preserve the operation or commit error as the actionable failure.
+          }
+        }
+
+        throw error;
+      } finally {
+        active = false;
+        client.release();
+      }
     },
   };
 }

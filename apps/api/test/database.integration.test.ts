@@ -169,12 +169,6 @@ describe.runIf(testDatabaseUrl !== undefined)('PostgreSQL adapter', () => {
         grantee: 'zampayroll_app',
         isGrantable: false,
         objectType: 'r',
-        privilegeType: 'DELETE',
-      },
-      {
-        grantee: 'zampayroll_app',
-        isGrantable: false,
-        objectType: 'r',
         privilegeType: 'INSERT',
       },
       {

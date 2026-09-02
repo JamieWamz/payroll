@@ -9,9 +9,10 @@ a feature, domain model, statutory rule, or security control has been
 implemented.
 
 > [!IMPORTANT]
-> There is no payroll engine or statutory calculation in Phase 1. PAYE, NAPSA,
-> NHIMA, payslips, employees, companies, authentication, authorization, and
-> finalized payroll runs are not implemented.
+> There is no payroll engine or statutory calculation. PAYE, NAPSA, NHIMA,
+> payslips, employees, authentication, authorized business routes, and
+> finalized payroll runs are not implemented. Company and identity records now
+> exist only as an internal domain and persistence foundation.
 
 The sequencing and security decisions for Phase 2 are recorded in
 [ADR 0001](decisions/0001-phase-2-domain-boundaries.md).
@@ -23,6 +24,14 @@ payroll-calculation contract. The contract defines the evidence a future
 calculator must receive and return; it is not a calculator implementation.
 There are no statutory constants, default rounding behavior, calculate route,
 or finalization route.
+
+The current persistence slice adds global user accounts plus company-scoped
+companies, memberships, roles, assignments, and permission identifiers. Every
+tenant table has forced row-level security. The runtime database adapter sets a
+validated company identifier locally inside one transaction; missing context
+sees no tenant records, and commit or rollback clears the setting before the
+pooled connection can be reused. Global user accounts remain invisible to the
+runtime role until the authentication architecture owns their access.
 
 Business HTTP routes remain closed until server-side authentication, CSRF
 protection, current company membership, RBAC, tenant context, and append-only
@@ -109,20 +118,27 @@ so connection details are not deliberately included in that event.
 
 The current roles and schemas separate bootstrap, DDL, and runtime access:
 
-| Identity/schema                              | Current responsibility                                                                                                              |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                          |
-| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                        |
-| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables. |
-| `app`                                        | Version-controlled application-object schema. It exists, but has no payroll domain tables in Phase 1.                               |
-| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                         |
-| `public`                                     | Default public access and schema creation are revoked.                                                                              |
+| Identity/schema                              | Current responsibility                                                                                                                    |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                |
+| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                              |
+| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.       |
+| `app`                                        | Version-controlled application objects. It currently contains the tenant/company/identity foundation, but no workforce or payroll tables. |
+| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                               |
+| `public`                                     | Default public access and schema creation are revoked.                                                                                    |
 
 The migrator's default privileges grant the runtime role table
-`SELECT`/`INSERT`/`UPDATE`/`DELETE`, sequence `USAGE`/`SELECT`, and function
-`EXECUTE` for future objects in `app`. Public function execution is revoked for
-those future objects. These are infrastructure defaults, not a substitute for
-future tenant authorization or row-level protection.
+`SELECT`/`INSERT`/`UPDATE`, sequence `USAGE`/`SELECT`, and function `EXECUTE`
+for future objects in `app`. Runtime `DELETE` is revoked. Public function
+execution is revoked for future objects. Table grants are still filtered by
+forced row-level security policies.
+
+The tenant setting is defense in depth, not proof of authorization. A process
+holding the runtime database credential can set a custom PostgreSQL setting,
+so future application services must derive the company from a live,
+authenticated membership and must never trust a client-selected company ID.
+The database policies then limit the impact of application mistakes and reject
+cross-tenant references after that application-level decision.
 
 Migrations are timestamped SQL, ordered, transaction-wrapped, and protected by
 an advisory lock. The migration identity and runtime identity use separate
@@ -146,8 +162,9 @@ connection URLs and passwords.
   `no-new-privileges`. PostgreSQL persists to a named volume.
 
 These controls are a starting baseline. Authentication, authorization,
-tenant isolation, encryption/key management, audit records, backup recovery,
-rate limiting, and production deployment policy remain future work.
+application-level tenant resolution, encryption/key management, audit records,
+backup recovery, rate limiting, and production deployment policy remain future
+work.
 
 ## Internal modular-monolith direction — Future
 
@@ -200,7 +217,7 @@ The following constraints apply when this future work begins:
 - Results should be immutable values; persistence and presentation should
   consume them without recalculating them differently.
 
-None of those rules or calculations exists in Phase 1.
+None of those rules or calculations exists yet.
 
 ## Finalization and audit boundary — Future
 
@@ -221,9 +238,12 @@ implemented.
 ## Testing strategy
 
 Current tests cover environment validation, API health behavior, the frontend
-foundation, the database adapter, and live PostgreSQL privileges when
-`TEST_DATABASE_URL` is supplied. The root quality gate runs formatting,
-linting, type checking, tests, and builds.
+foundation, pure domain values, the database adapter, and live PostgreSQL
+privileges when `TEST_DATABASE_URL` is supplied. With both test database URLs,
+the integration suite also verifies forced RLS, tenant visibility, transaction
+context cleanup, composite cross-tenant references, lifecycle/value
+constraints, restricted deletes, and global-user deny defaults. The root
+quality gate runs formatting, linting, type checking, tests, and builds.
 
 Future domain tests must cover zero and low income, normal salaries,
 allowances, deductions, statutory and rounding boundaries, configuration

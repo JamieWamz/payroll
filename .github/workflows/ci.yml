@@ -183,8 +183,11 @@ jobs:
 
           # The generated file contains only CI-owned, URL-safe values.
           source "$CI_ENV_FILE"
+          TEST_DATABASE_MIGRATION_URL="postgresql://zampayroll_migrator:${MIGRATION_DB_PASSWORD}@127.0.0.1:${postgres_port}/${POSTGRES_DB}" \
           TEST_DATABASE_URL="postgresql://zampayroll_app:${APP_DB_PASSWORD}@127.0.0.1:${postgres_port}/${POSTGRES_DB}" \
-            npm run test --workspace @zampayroll/api -- database.integration.test.ts
+            npm run test --workspace @zampayroll/api -- \
+              database.integration.test.ts \
+              tenant-identity.integration.test.ts
 
       - name: Start production stack
         run: |

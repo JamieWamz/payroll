@@ -5,11 +5,11 @@ and accounting firms.
 
 > [!WARNING]
 > **Phase 1 is complete and Phase 2 domain work is in progress.** The system
-> does not yet
-> implement payroll calculations, PAYE, NAPSA, NHIMA, payslips, statutory
-> reports, authentication, or employee/company records. No statutory rate in
-> this repository should be inferred or used for real payroll. The current
-> application is not production-ready.
+> does not yet implement authentication, employee workflows, payroll
+> calculations, PAYE, NAPSA, NHIMA, payslips, or statutory reports. The new
+> company and identity foundation is internal only and has no business HTTP
+> routes. No statutory rate in this repository should be inferred or used for
+> real payroll. The current application is not production-ready.
 
 ## What exists today
 
@@ -21,6 +21,13 @@ and accounting firms.
   and the Nginx-served web application.
 - Runtime environment validation, API liveness/readiness routes, security
   headers, structured logging, and graceful shutdown.
+- Framework-independent company, user, role, permission, and membership domain
+  values with validation and immutable update operations.
+- A tenant and identity PostgreSQL schema with composite tenant references,
+  forced row-level security, deny-by-default global users, and no runtime hard
+  deletes.
+- A database adapter that scopes tenant work to one transaction and clears its
+  company context automatically on commit or rollback.
 - Unit, API, frontend, and PostgreSQL integration test foundations.
 - Shared linting, formatting, type-checking, build, and CI gates.
 
@@ -140,8 +147,11 @@ docker compose --env-file .env -f compose.yaml -f compose.dev.yaml up --detach p
 | API readiness        | `/api/health/ready`            | Confirms the runtime DB role and `app` schema are ready |
 | Web-container health | `http://127.0.0.1:8080/health` | Confirms Nginx can serve requests                       |
 
-The API currently exposes health routes only. A readiness failure returns
-HTTP `503` without returning the underlying database error to the client.
+The API still exposes health routes only. Company and identity records are not
+reachable through HTTP until the authentication, authorization, tenant
+resolution, CSRF, throttling, and audit boundaries are implemented. A
+readiness failure returns HTTP `503` without returning the underlying database
+error to the client.
 
 ## Quality checks and tests
 
@@ -152,9 +162,9 @@ npm run check
 ```
 
 That command checks formatting, linting, types, tests, and production builds.
-The PostgreSQL integration suite runs only when `TEST_DATABASE_URL` is exported
-and the foundation migration has been applied. To include it with the values in
-your local `.env`:
+PostgreSQL integration suites run only when `TEST_DATABASE_URL` is exported;
+the tenant/identity suite also requires `TEST_DATABASE_MIGRATION_URL`. Apply
+all migrations first. To include them with the values in your local `.env`:
 
 ```sh
 set -a
@@ -219,7 +229,7 @@ environment files are ignored by Git.
 | Host port mappings    | `API_PORT`, `WEB_PORT`, `POSTGRES_PORT`                                                                                            |
 | PostgreSQL bootstrap  | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`                                                                                |
 | Least-privilege roles | `MIGRATION_DB_PASSWORD`, `APP_DB_PASSWORD`                                                                                         |
-| Host DB URLs          | `DATABASE_MIGRATION_URL`, `DATABASE_URL`, `TEST_DATABASE_URL`                                                                      |
+| Host DB URLs          | `DATABASE_MIGRATION_URL`, `DATABASE_URL`, `TEST_DATABASE_MIGRATION_URL`, `TEST_DATABASE_URL`                                       |
 | Compose DB URLs       | `COMPOSE_DATABASE_MIGRATION_URL`, `COMPOSE_DATABASE_URL`                                                                           |
 | Pool and TLS          | `DATABASE_SSL`, `DATABASE_POOL_MAX`, `DATABASE_CONNECTION_TIMEOUT_MS`, `DATABASE_IDLE_TIMEOUT_MS`, `DATABASE_STATEMENT_TIMEOUT_MS` |
 
