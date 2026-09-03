@@ -1,20 +1,52 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
 
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
 describe('App', () => {
-  it('identifies the product as a Phase 1 foundation', () => {
+  it('shows the completed Phase 2 foundations without claiming payroll exists', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => undefined)),
+    );
     render(<App />);
 
     expect(
-      screen.getByRole('heading', { level: 1, name: 'ZamPayroll' }),
+      screen.getByRole('heading', {
+        level: 1,
+        name: /Payroll built from rules you can prove/i,
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Phase 1 foundation');
+    expect(screen.getByText('Phase 2 · Domain foundation')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Workforce' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Payroll calculations and statutory rates are not implemented yet.',
+        /PAYE, NAPSA, and NHIMA logic will only follow reviewed/i,
       ),
     ).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Checking runtime');
+  });
+
+  it('reports when the API and database are ready', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ status: 'ready' }), { status: 200 }),
+        ),
+      ),
+    );
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('System ready');
+    });
   });
 });
