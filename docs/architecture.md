@@ -10,14 +10,16 @@ implemented.
 
 > [!IMPORTANT]
 > There is no payroll engine or statutory calculation. PAYE, NAPSA, NHIMA,
-> payslips, employees, authentication, authorized business routes, and
-> finalized payroll runs are not implemented. Company and identity records now
-> exist only as an internal domain and persistence foundation.
+> payslips, authentication requests, authorized business routes, and finalized
+> payroll runs are not implemented. Company, identity, and minimal workforce
+> records exist only as internal domain and persistence foundations.
 
 The sequencing and security decisions for Phase 2 are recorded in
 [ADR 0001](decisions/0001-phase-2-domain-boundaries.md). Authentication details
 are recorded in
-[ADR 0002](decisions/0002-authentication-security-foundation.md).
+[ADR 0002](decisions/0002-authentication-security-foundation.md), and workforce
+details are recorded in
+[ADR 0003](decisions/0003-workforce-foundation.md).
 
 ## Current Phase 2 boundary
 
@@ -44,6 +46,15 @@ table privileges. A security-definer function is the only current runtime path
 into the append-only audit table and rejects tenant IDs that differ from the
 transaction context. These are internal primitives: credential/session access,
 cookie delivery, throttling, and authentication routes remain closed.
+
+The workforce foundation stores only company-scoped employee numbers, names,
+lifecycle state, position titles, and inclusive employment dates. Pure domain
+behavior rejects overlapping employment histories and prevents archival while
+an employment remains open. Composite database references prevent an
+employment from pointing at another company's employee; forced RLS hides both
+tables without transaction tenant context. The database also permits at most
+one open employment period per employee. No national identifier, bank detail,
+contact detail, compensation, statutory identifier, or employee route exists.
 
 Business HTTP routes remain closed until server-side authentication, CSRF
 protection, current company membership, RBAC, tenant context, and append-only
@@ -130,14 +141,14 @@ so connection details are not deliberately included in that event.
 
 The current roles and schemas separate bootstrap, DDL, and runtime access:
 
-| Identity/schema                              | Current responsibility                                                                                                                                |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                            |
-| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                          |
-| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                   |
-| `app`                                        | Version-controlled application objects. It contains tenant, identity, credential, session, and audit foundations, but no workforce or payroll tables. |
-| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                           |
-| `public`                                     | Default public access and schema creation are revoked.                                                                                                |
+| Identity/schema                              | Current responsibility                                                                                                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                                          |
+| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                                        |
+| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                                 |
+| `app`                                        | Version-controlled application objects. It contains tenant, identity, credential, session, audit, and workforce foundations, but no compensation or payroll tables. |
+| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                                         |
+| `public`                                     | Default public access and schema creation are revoked.                                                                                                              |
 
 The migrator's default privileges grant the runtime role table
 `SELECT`/`INSERT`/`UPDATE`, sequence `USAGE`/`SELECT`, and function `EXECUTE`
@@ -186,13 +197,13 @@ domain model while depending on other modules through explicit interfaces.
 Presentation and infrastructure code may call domain/application code; domain
 code must not depend on HTTP, React, Fastify, PostgreSQL, or Docker.
 
-Candidate future module boundaries are:
+Current and candidate module boundaries are:
 
 | Module                  | Future ownership                                                                                     |
 | ----------------------- | ---------------------------------------------------------------------------------------------------- |
 | Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                      |
 | Company                 | Company profile, payroll settings, and statutory identifiers                                         |
-| Workforce               | Employees and employment lifecycle                                                                   |
+| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed) |
 | Compensation            | Salaries, allowances, and deductions                                                                 |
 | Payroll                 | Periods, runs, employee results, calculation orchestration, finalization, corrections, and reversals |
 | Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                |
@@ -240,10 +251,10 @@ that preserve the original result and create an auditable relationship to the
 new record.
 
 Application audit integration must capture important company, employee,
-configuration,
-calculation, finalization, correction, user, and authorization events without
-copying unnecessary payroll or authentication secrets into logs. Audit records
-must include reliable actor, tenant, event, target, and time context.
+configuration, calculation, finalization, correction, user, and authorization
+events without copying unnecessary payroll or authentication secrets into
+logs. Audit records must include reliable actor, tenant, event, target, and
+time context.
 
 The append-only storage and bounded event foundations exist, but no business or
 authentication workflow emits audit events yet. Finalized payroll is not
@@ -257,10 +268,12 @@ privileges when `TEST_DATABASE_URL` is supplied. With both test database URLs,
 the integration suite also verifies forced RLS, tenant visibility, transaction
 context cleanup, composite cross-tenant references, lifecycle/value
 constraints, restricted deletes, global-user deny defaults, credential/session
-table denial, and tenant-checked audit appends. Security unit tests cover the
-password policy contract, Argon2id parameters, opaque tokens, authorization,
-and bounded metadata. The root quality gate runs formatting, linting, type
-checking, tests, and builds.
+table denial, tenant-checked audit appends, workforce tenant isolation, and
+cross-company employment rejection. Security unit tests cover the password
+policy contract, Argon2id parameters, opaque tokens, authorization, and bounded
+metadata. Workforce tests cover normalized employee identity, inclusive date
+semantics, history overlap, termination, and guarded archival. The root quality
+gate runs formatting, linting, type checking, tests, and builds.
 
 Future domain tests must cover zero and low income, normal salaries,
 allowances, deductions, statutory and rounding boundaries, configuration

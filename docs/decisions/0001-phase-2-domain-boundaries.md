@@ -70,11 +70,13 @@ automated tests, security review, documentation, commit, and push.
 
 ## Implementation status
 
-Steps 1 and 2 are implemented. Step 3 is in progress: password, opaque token,
+Steps 1 and 2 are implemented. Step 3's internal password, opaque token,
 authorization, credential/session schema, and append-only audit foundations
-exist, but the runtime credential/session access layer, cookie delivery,
-throttling, and authentication routes do not. There are no registration,
-login, company, membership, or role routes.
+exist, but its runtime access layer, cookie delivery, throttling, and routes do
+not. Step 5's internal employee and effective-dated employment foundations are
+also implemented. Steps 4 and 5's authorized HTTP behavior remains blocked on
+completion of step 3. There are no registration, login, company, membership,
+role, employee, or employment routes.
 
 ## Consequences
 

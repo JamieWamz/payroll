@@ -1,10 +1,10 @@
 # Security Policy
 
 ZamPayroll is currently in Phase 2 foundation work. It does not yet process
-payroll, employee records, statutory calculations, or authentication requests,
-and it has not been declared production-ready. Internal credential, session,
-authorization, and audit primitives now exist, so security reports about those
-boundaries are important.
+payroll, statutory calculations, or authentication requests, and it has not
+been declared production-ready. Internal credential, session, authorization,
+audit, and tenant-isolated workforce primitives now exist, so security reports
+about those boundaries are important.
 
 ## Supported versions
 

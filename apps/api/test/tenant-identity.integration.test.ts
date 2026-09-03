@@ -343,12 +343,23 @@ describe.runIf(
       companyCount: number;
       currentUser: string;
       userCount: number;
-    }>(`
-      SELECT
-        current_user AS "currentUser",
-        (SELECT count(*)::integer FROM app.companies) AS "companyCount",
-        (SELECT count(*)::integer FROM app.user_accounts) AS "userCount"
-    `);
+    }>(
+      `
+        SELECT
+          current_user AS "currentUser",
+          (
+            SELECT count(*)::integer
+            FROM app.companies
+            WHERE id = ANY($1::uuid[])
+          ) AS "companyCount",
+          (
+            SELECT count(*)::integer
+            FROM app.user_accounts
+            WHERE id = $2
+          ) AS "userCount"
+      `,
+      [Object.values(fixture.companies), fixture.userAccount],
+    );
 
     expect(migratorVisibility.rows).toEqual([
       {

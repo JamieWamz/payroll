@@ -188,7 +188,8 @@ jobs:
             npm run test --workspace @zampayroll/api -- \
               authentication-audit.integration.test.ts \
               database.integration.test.ts \
-              tenant-identity.integration.test.ts
+              tenant-identity.integration.test.ts \
+              workforce.integration.test.ts
 
       - name: Start production stack
         run: |
