@@ -15,7 +15,9 @@ implemented.
 > exist only as an internal domain and persistence foundation.
 
 The sequencing and security decisions for Phase 2 are recorded in
-[ADR 0001](decisions/0001-phase-2-domain-boundaries.md).
+[ADR 0001](decisions/0001-phase-2-domain-boundaries.md). Authentication details
+are recorded in
+[ADR 0002](decisions/0002-authentication-security-foundation.md).
 
 ## Current Phase 2 boundary
 
@@ -32,6 +34,16 @@ validated company identifier locally inside one transaction; missing context
 sees no tenant records, and commit or rollback clears the setting before the
 pooled connection can be reused. Global user accounts remain invisible to the
 runtime role until the authentication architecture owns their access.
+
+The authentication foundation now provides an Argon2id password-verifier
+adapter, an injected password-blocklist contract, independently generated
+opaque session and CSRF tokens, immutable authorization principals, and a
+bounded audit-event contract that rejects secret-bearing metadata keys.
+Credential and server-side session tables have forced RLS and no direct runtime
+table privileges. A security-definer function is the only current runtime path
+into the append-only audit table and rejects tenant IDs that differ from the
+transaction context. These are internal primitives: credential/session access,
+cookie delivery, throttling, and authentication routes remain closed.
 
 Business HTTP routes remain closed until server-side authentication, CSRF
 protection, current company membership, RBAC, tenant context, and append-only
@@ -118,14 +130,14 @@ so connection details are not deliberately included in that event.
 
 The current roles and schemas separate bootstrap, DDL, and runtime access:
 
-| Identity/schema                              | Current responsibility                                                                                                                    |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                |
-| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                              |
-| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.       |
-| `app`                                        | Version-controlled application objects. It currently contains the tenant/company/identity foundation, but no workforce or payroll tables. |
-| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                               |
-| `public`                                     | Default public access and schema creation are revoked.                                                                                    |
+| Identity/schema                              | Current responsibility                                                                                                                                |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                            |
+| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                          |
+| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                   |
+| `app`                                        | Version-controlled application objects. It contains tenant, identity, credential, session, and audit foundations, but no workforce or payroll tables. |
+| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                           |
+| `public`                                     | Default public access and schema creation are revoked.                                                                                                |
 
 The migrator's default privileges grant the runtime role table
 `SELECT`/`INSERT`/`UPDATE`, sequence `USAGE`/`SELECT`, and function `EXECUTE`
@@ -161,10 +173,10 @@ connection URLs and passwords.
   unprivileged users, dropped Linux capabilities, and
   `no-new-privileges`. PostgreSQL persists to a named volume.
 
-These controls are a starting baseline. Authentication, authorization,
-application-level tenant resolution, encryption/key management, audit records,
-backup recovery, rate limiting, and production deployment policy remain future
-work.
+These controls are a starting baseline. Authentication routes, credential and
+session access services, authorization enforcement, application-level tenant
+resolution, encryption/key management, application audit integration, backup
+recovery, rate limiting, and production deployment policy remain future work.
 
 ## Internal modular-monolith direction — Future
 
@@ -227,12 +239,14 @@ Corrections and reversals must be explicit, separately authorized workflows
 that preserve the original result and create an auditable relationship to the
 new record.
 
-Future audit design must capture important company, employee, configuration,
+Application audit integration must capture important company, employee,
+configuration,
 calculation, finalization, correction, user, and authorization events without
 copying unnecessary payroll or authentication secrets into logs. Audit records
 must include reliable actor, tenant, event, target, and time context.
 
-These are design requirements only; finalized payroll and audit logging are not
+The append-only storage and bounded event foundations exist, but no business or
+authentication workflow emits audit events yet. Finalized payroll is not
 implemented.
 
 ## Testing strategy
@@ -242,8 +256,11 @@ foundation, pure domain values, the database adapter, and live PostgreSQL
 privileges when `TEST_DATABASE_URL` is supplied. With both test database URLs,
 the integration suite also verifies forced RLS, tenant visibility, transaction
 context cleanup, composite cross-tenant references, lifecycle/value
-constraints, restricted deletes, and global-user deny defaults. The root
-quality gate runs formatting, linting, type checking, tests, and builds.
+constraints, restricted deletes, global-user deny defaults, credential/session
+table denial, and tenant-checked audit appends. Security unit tests cover the
+password policy contract, Argon2id parameters, opaque tokens, authorization,
+and bounded metadata. The root quality gate runs formatting, linting, type
+checking, tests, and builds.
 
 Future domain tests must cover zero and low income, normal salaries,
 allowances, deductions, statutory and rounding boundaries, configuration

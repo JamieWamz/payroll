@@ -1,9 +1,10 @@
 # Security Policy
 
-ZamPayroll is currently a Phase 1 foundation. It does not yet process payroll,
-employee records, statutory calculations, or authentication, and it has not
-been declared production-ready. Security reports about the foundation are
-still important.
+ZamPayroll is currently in Phase 2 foundation work. It does not yet process
+payroll, employee records, statutory calculations, or authentication requests,
+and it has not been declared production-ready. Internal credential, session,
+authorization, and audit primitives now exist, so security reports about those
+boundaries are important.
 
 ## Supported versions
 
@@ -62,6 +63,9 @@ permission to assess.
 - Treat database connection URLs as secrets because they contain passwords.
 - Minimize log fields and diagnostic exports. Do not log authentication secrets
   or complete payroll/request payloads.
+- Never log passwords, encoded password verifiers, opaque session tokens, CSRF
+  tokens, cookies, authorization headers, or raw client IP addresses. The audit
+  contract deliberately rejects secret-bearing metadata keys.
 - If a secret is exposed, revoke or rotate it at its source; deleting Git
   history or closing an issue is not sufficient.
 - If personal or payroll data may be exposed, stop further disclosure,
@@ -74,8 +78,8 @@ The Compose files are a local and foundation deployment baseline. Example
 passwords are unsafe, PostgreSQL passwords stored in an initialized named
 volume do not change merely because `.env` changes, and the repository does not
 provide production TLS termination, external secret management, backup and
-restore operations, monitoring/alerting, rate limiting, authentication,
-tenant authorization, or compliance certification.
+restore operations, monitoring/alerting, rate limiting, authentication routes,
+tenant authorization enforcement, or compliance certification.
 
 Anyone deploying the software is responsible for threat modeling the target
 environment, replacing all credentials, restricting ingress, configuring TLS

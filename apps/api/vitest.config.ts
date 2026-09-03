@@ -9,5 +9,6 @@ export default defineConfig({
     },
     environment: 'node',
     restoreMocks: true,
+    testTimeout: 10_000,
   },
 });

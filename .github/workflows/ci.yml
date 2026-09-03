@@ -186,6 +186,7 @@ jobs:
           TEST_DATABASE_MIGRATION_URL="postgresql://zampayroll_migrator:${MIGRATION_DB_PASSWORD}@127.0.0.1:${postgres_port}/${POSTGRES_DB}" \
           TEST_DATABASE_URL="postgresql://zampayroll_app:${APP_DB_PASSWORD}@127.0.0.1:${postgres_port}/${POSTGRES_DB}" \
             npm run test --workspace @zampayroll/api -- \
+              authentication-audit.integration.test.ts \
               database.integration.test.ts \
               tenant-identity.integration.test.ts
 

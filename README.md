@@ -28,6 +28,12 @@ and accounting firms.
   deletes.
 - A database adapter that scopes tenant work to one transaction and clears its
   company context automatically on commit or rollback.
+- Argon2id password-verifier, opaque session/CSRF token, authorization
+  principal, and bounded audit-event contracts. Registration and login routes
+  are intentionally not open yet.
+- Forced-RLS credential, server-side session, and append-only audit tables.
+  The runtime role has no direct access to those tables; only a tenant-checked
+  audit append function is currently exposed.
 - Unit, API, frontend, and PostgreSQL integration test foundations.
 - Shared linting, formatting, type-checking, build, and CI gates.
 
@@ -39,6 +45,10 @@ The accepted Phase 2 sequencing and security boundary is recorded in
 [ADR 0001](docs/decisions/0001-phase-2-domain-boundaries.md). In particular,
 business CRUD will not be exposed through temporary identity headers or other
 insecure development shortcuts.
+
+The authentication primitives and their intentionally closed runtime boundary
+are recorded in
+[ADR 0002](docs/decisions/0002-authentication-security-foundation.md).
 
 ## Technology
 

@@ -70,10 +70,11 @@ automated tests, security review, documentation, commit, and push.
 
 ## Implementation status
 
-Steps 1 and 2 are implemented. The company and identity tables are internal:
-there are no registration, login, company, membership, or role routes. Step 3,
-including server-side sessions and append-only audit, is the next security
-boundary before authorized business behavior can be exposed.
+Steps 1 and 2 are implemented. Step 3 is in progress: password, opaque token,
+authorization, credential/session schema, and append-only audit foundations
+exist, but the runtime credential/session access layer, cookie delivery,
+throttling, and authentication routes do not. There are no registration,
+login, company, membership, or role routes.
 
 ## Consequences
 
