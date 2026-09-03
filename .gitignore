@@ -20,6 +20,7 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+webServerApiSettings.json
 
 # Test and tool caches
 .eslintcache
