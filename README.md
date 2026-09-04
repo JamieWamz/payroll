@@ -7,10 +7,10 @@ and accounting firms.
 > **Phase 1 is complete and Phase 2 domain work is in progress.** The system
 > does not yet implement authentication requests, employee workflows, payroll
 > calculations, PAYE, NAPSA, NHIMA, payslips, or statutory reports. The new
-> company, identity, workforce, compensation, and payroll-period foundations
-> are internal only and have no business HTTP routes. No statutory rate should be
-> inferred or used for real payroll. The current application is not
-> production-ready.
+> company, identity, workforce, compensation, payroll-period, and statutory
+> evidence foundations are internal only and have no business HTTP routes. No
+> statutory rate should be inferred or used for real payroll. The current
+> application is not production-ready.
 
 ## What exists today
 
@@ -44,6 +44,10 @@ and accounting firms.
   deductions, with employment-bound dates and concurrent overlap protection.
 - Explicit regular and off-cycle payroll periods with separate payment dates;
   regular periods cannot overlap within a company.
+- Effective-dated statutory configuration drafts with required ZRA, NAPSA, and
+  NHIMA source evidence, human verification attribution, immutable verified
+  history, tenant isolation, and concurrent overlap prevention. This layer
+  deliberately contains no approved rates yet.
 - Unit, API, frontend, and PostgreSQL integration test foundations.
 - Shared linting, formatting, type-checking, build, and CI gates.
 
@@ -63,6 +67,9 @@ Workforce data-minimization and employment-history decisions are recorded in
 [ADR 0003](docs/decisions/0003-workforce-foundation.md).
 Compensation and payroll-period decisions are recorded in
 [ADR 0004](docs/decisions/0004-compensation-payroll-period-foundation.md).
+Statutory evidence decisions and current source gaps are recorded in
+[ADR 0005](docs/decisions/0005-statutory-configuration-evidence.md) and the
+[statutory source register](docs/statutory-source-register.md).
 The externally researched interaction direction is recorded in the
 [product design guidelines](docs/product-design-guidelines.md).
 

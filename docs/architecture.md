@@ -12,8 +12,8 @@ implemented.
 > There is no payroll engine or statutory calculation. PAYE, NAPSA, NHIMA,
 > payslips, authentication requests, authorized business routes, and finalized
 > payroll runs are not implemented. Company, identity, workforce,
-> compensation, and payroll-period records exist only as internal domain and
-> persistence foundations.
+> compensation, payroll-period, and statutory-evidence records exist only as
+> internal domain and persistence foundations. No statutory rates are approved.
 
 The sequencing and security decisions for Phase 2 are recorded in
 [ADR 0001](decisions/0001-phase-2-domain-boundaries.md). Authentication details
@@ -23,6 +23,8 @@ details are recorded in
 [ADR 0003](decisions/0003-workforce-foundation.md).
 Compensation and payroll-period decisions are recorded in
 [ADR 0004](decisions/0004-compensation-payroll-period-foundation.md).
+Statutory evidence and verification decisions are recorded in
+[ADR 0005](decisions/0005-statutory-configuration-evidence.md).
 
 ## Current Phase 2 boundary
 
@@ -66,6 +68,15 @@ matching component periods. Component records deliberately contain no guessed
 taxability behavior. Explicit regular and off-cycle payroll periods carry a
 separate payment date; regular periods cannot overlap within one company.
 These tables also force tenant RLS and deny runtime hard deletes.
+
+The statutory-configuration foundation stores effective-dated draft,
+verified, and retired evidence versions. Verification requires source records
+from ZRA, NAPSA, and NHIMA plus an active company membership and timestamp.
+Database and domain rules prevent applicable-period overlap and prevent any
+verified parameters or sources from being rewritten. The records contain
+evidence-state placeholders only: no rates, bands, ceilings, calculation bases,
+or rounding behavior have been adopted. Research status is maintained in the
+[statutory source register](statutory-source-register.md).
 
 Business HTTP routes remain closed until server-side authentication, CSRF
 protection, current company membership, RBAC, tenant context, and append-only
@@ -152,14 +163,14 @@ so connection details are not deliberately included in that event.
 
 The current roles and schemas separate bootstrap, DDL, and runtime access:
 
-| Identity/schema                              | Current responsibility                                                                                                                                                             |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                                                         |
-| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                                                       |
-| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                                                |
-| `app`                                        | Version-controlled tenant, identity, credential, session, audit, workforce, compensation, and payroll-period foundations. It contains no payroll-run or calculation-result tables. |
-| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                                                        |
-| `public`                                     | Default public access and schema creation are revoked.                                                                                                                             |
+| Identity/schema                              | Current responsibility                                                                                                                                                                                 |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                                                                             |
+| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                                                                           |
+| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                                                                    |
+| `app`                                        | Version-controlled tenant, identity, credential, session, audit, workforce, compensation, payroll-period, and statutory-evidence foundations. It contains no payroll-run or calculation-result tables. |
+| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                                                                            |
+| `public`                                     | Default public access and schema creation are revoked.                                                                                                                                                 |
 
 The migrator's default privileges grant the runtime role table
 `SELECT`/`INSERT`/`UPDATE`, sequence `USAGE`/`SELECT`, and function `EXECUTE`
