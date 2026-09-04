@@ -129,6 +129,26 @@ export function compensationComponentIsEffectiveOn(
   return intervalContains(component.effectivePeriod, date);
 }
 
+export function endCompensationComponent(
+  employment: Readonly<Employment>,
+  component: Readonly<CompensationComponent>,
+  endsOn: string,
+): Readonly<CompensationComponent> {
+  if (component.effectivePeriod.endsOn !== undefined) {
+    throw new DomainError(
+      'COMPENSATION_ALREADY_ENDED',
+      'An ended compensation component cannot be ended again',
+      { entity: 'CompensationComponent' },
+    );
+  }
+  const effectivePeriod = createDateInterval(
+    component.effectivePeriod.startsOn,
+    parseLocalDate(endsOn),
+  );
+  assertPeriodWithinEmployment(employment, effectivePeriod);
+  return Object.freeze({ ...component, effectivePeriod });
+}
+
 export function normalizeComponentCode(value: string): string {
   const normalized = value.normalize('NFKC').trim().toUpperCase();
 

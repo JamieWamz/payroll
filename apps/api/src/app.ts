@@ -14,6 +14,7 @@ import type { PasswordBlocklist } from './modules/identity-access/security/index
 import { DomainError } from './shared/domain/domain-error.js';
 import { authenticationRoutes } from './routes/authentication.js';
 import { companyWorkforceRoutes } from './routes/company-workforce.js';
+import { compensationRoutes } from './routes/compensation.js';
 import { healthRoutes } from './routes/health.js';
 
 interface BuildAppOptions {
@@ -75,6 +76,11 @@ export async function buildApp({
     prefix: '/api',
   });
   await app.register(companyWorkforceRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
+  await app.register(compensationRoutes, {
     database,
     environment,
     prefix: '/api',

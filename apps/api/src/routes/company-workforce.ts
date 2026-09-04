@@ -8,7 +8,6 @@ import type {
   TenantTransaction,
 } from '../infrastructure/database.js';
 import { normalizeCompanyName } from '../modules/companies/domain/index.js';
-import type { AuthorizationPrincipal } from '../modules/identity-access/security/index.js';
 import {
   archiveEmployee,
   assertEmploymentHistory,
@@ -20,6 +19,7 @@ import {
 } from '../modules/workforce/domain/index.js';
 import { parseEntityId } from '../shared/domain/entity-id.js';
 import { ApiError } from './api-error.js';
+import { appendSuccessfulAuditEvent } from './audit.js';
 import { withAuthorizedCompanyTransaction } from './tenant-authorization.js';
 
 interface CompanyWorkforceRoutesOptions {
@@ -185,7 +185,7 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
         if (companyRecord === undefined) {
           throw new ApiError(409, 'Company was changed by another request');
         }
-        await appendAuditEvent(transaction, principal, request.id, {
+        await appendSuccessfulAuditEvent(transaction, principal, request.id, {
           eventType: 'company.profile-updated',
           targetId: companyRecord.id,
           targetType: 'company',
@@ -277,7 +277,7 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
           if (employment !== undefined) {
             await insertEmployment(transaction, employment);
           }
-          await appendAuditEvent(transaction, principal, request.id, {
+          await appendSuccessfulAuditEvent(transaction, principal, request.id, {
             eventType: 'workforce.employee-created',
             targetId: employee.id,
             targetType: 'employee',
@@ -427,11 +427,16 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
                 'Employee was changed by another request',
               );
             }
-            await appendAuditEvent(transaction, principal, request.id, {
-              eventType: 'workforce.employee-updated',
-              targetId: updatedRecord.id,
-              targetType: 'employee',
-            });
+            await appendSuccessfulAuditEvent(
+              transaction,
+              principal,
+              request.id,
+              {
+                eventType: 'workforce.employee-updated',
+                targetId: updatedRecord.id,
+                targetType: 'employee',
+              },
+            );
             return updatedRecord;
           },
         );
@@ -481,11 +486,16 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
             ).map((record) => toEmploymentDomain(record, employee));
             assertEmploymentHistory(employee, [...existing, employment]);
             await insertEmployment(transaction, employment);
-            await appendAuditEvent(transaction, principal, request.id, {
-              eventType: 'workforce.employment-created',
-              targetId: employment.id,
-              targetType: 'employment',
-            });
+            await appendSuccessfulAuditEvent(
+              transaction,
+              principal,
+              request.id,
+              {
+                eventType: 'workforce.employment-created',
+                targetId: employment.id,
+                targetType: 'employment',
+              },
+            );
             return employment;
           },
         );
@@ -572,11 +582,16 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
                 'Employment was changed by another request',
               );
             }
-            await appendAuditEvent(transaction, principal, request.id, {
-              eventType: 'workforce.employment-ended',
-              targetId: updatedRecord.id,
-              targetType: 'employment',
-            });
+            await appendSuccessfulAuditEvent(
+              transaction,
+              principal,
+              request.id,
+              {
+                eventType: 'workforce.employment-ended',
+                targetId: updatedRecord.id,
+                targetType: 'employment',
+              },
+            );
             return updatedRecord;
           },
         );
@@ -733,28 +748,6 @@ async function insertEmployment(
       employment.positionTitle,
       employment.effectivePeriod.startsOn,
       employment.effectivePeriod.endsOn ?? null,
-    ],
-  );
-}
-
-async function appendAuditEvent(
-  transaction: TenantTransaction,
-  principal: Readonly<AuthorizationPrincipal>,
-  requestId: string,
-  event: { eventType: string; targetId: string; targetType: string },
-): Promise<void> {
-  await transaction.query(
-    `SELECT app.append_audit_event(
-       $1, $2, $3, $4, 'succeeded', $5, $6, $7, NULL, '{}'::jsonb
-     )`,
-    [
-      randomUUID(),
-      principal.companyId,
-      principal.userAccountId,
-      event.eventType,
-      event.targetType,
-      event.targetId,
-      requestId,
     ],
   );
 }

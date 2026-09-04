@@ -192,6 +192,120 @@ describe.runIf(
       version: 1,
     });
 
+    const salary = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'POST',
+      payload: {
+        amount: '12500.50',
+        startsOn: '2026-01-01',
+      },
+      url: `/api/companies/${primary.companyId}/employments/${employmentId}/salaries`,
+    });
+    expect(salary.statusCode).toBe(201);
+    expect(salary.json()).toMatchObject({
+      amount: { amount: '12500.50', currency: 'ZMW', scale: 2 },
+      basis: 'monthly',
+    });
+
+    const allowance = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'POST',
+      payload: {
+        amount: '750',
+        code: 'transport_allowance',
+        kind: 'allowance',
+        name: 'Transport allowance',
+        startsOn: '2026-01-01',
+      },
+      url: `/api/companies/${primary.companyId}/employments/${employmentId}/components`,
+    });
+    expect(allowance.statusCode).toBe(201);
+    expect(allowance.json()).toMatchObject({
+      amount: { amount: '750.00', currency: 'ZMW' },
+      code: 'TRANSPORT_ALLOWANCE',
+      kind: 'allowance',
+    });
+
+    const compensation = await requireApp().inject({
+      headers: { cookie: primary.cookie },
+      method: 'GET',
+      url: `/api/companies/${primary.companyId}/employments/${employmentId}/compensation`,
+    });
+    expect(compensation.statusCode).toBe(200);
+    expect(compensation.json()).toMatchObject({
+      components: [{ code: 'TRANSPORT_ALLOWANCE', version: 1 }],
+      salaries: [{ amount: { amount: '12500.50' }, version: 1 }],
+    });
+
+    const overlappingSalary = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'POST',
+      payload: { amount: '14000.00', startsOn: '2026-06-01' },
+      url: `/api/companies/${primary.companyId}/employments/${employmentId}/salaries`,
+    });
+    expect(overlappingSalary.statusCode).toBe(409);
+
+    const staleSalaryEnd = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'PATCH',
+      payload: { endsOn: '2026-11-30', expectedVersion: 2 },
+      url: `/api/companies/${primary.companyId}/employments/${employmentId}/salaries/${salary.json<{ id: string }>().id}/end`,
+    });
+    expect(staleSalaryEnd.statusCode).toBe(409);
+
+    const endedSalary = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'PATCH',
+      payload: { endsOn: '2026-12-31', expectedVersion: 1 },
+      url: `/api/companies/${primary.companyId}/employments/${employmentId}/salaries/${salary.json<{ id: string }>().id}/end`,
+    });
+    expect(endedSalary.statusCode).toBe(200);
+    expect(endedSalary.json()).toMatchObject({
+      endsOn: '2026-12-31',
+      version: 2,
+    });
+
+    const endedAllowance = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'PATCH',
+      payload: { endsOn: '2026-12-31', expectedVersion: 1 },
+      url: `/api/companies/${primary.companyId}/employments/${employmentId}/components/${allowance.json<{ id: string }>().id}/end`,
+    });
+    expect(endedAllowance.statusCode).toBe(200);
+    expect(endedAllowance.json()).toMatchObject({
+      endsOn: '2026-12-31',
+      version: 2,
+    });
+
+    const endedCompensation = await requireApp().inject({
+      headers: { cookie: primary.cookie },
+      method: 'GET',
+      url: `/api/companies/${primary.companyId}/employments/${employmentId}/compensation`,
+    });
+    expect(endedCompensation.statusCode).toBe(200);
+    expect(endedCompensation.json()).toMatchObject({
+      components: [{ endsOn: '2026-12-31', version: 2 }],
+      salaries: [{ endsOn: '2026-12-31', version: 2 }],
+    });
+
     const overlappingEmployment = await requireApp().inject({
       headers: {
         cookie: primary.cookie,
@@ -278,6 +392,10 @@ describe.runIf(
         WHERE company_id = $1
           AND event_type IN (
             'company.profile-updated',
+            'compensation.component-created',
+            'compensation.component-ended',
+            'compensation.salary-created',
+            'compensation.salary-ended',
             'workforce.employee-created',
             'workforce.employee-updated',
             'workforce.employment-ended'
@@ -288,6 +406,22 @@ describe.runIf(
     );
     expect(audit.rows).toEqual([
       { eventType: 'company.profile-updated', targetId: primary.companyId },
+      {
+        eventType: 'compensation.component-created',
+        targetId: allowance.json<{ id: string }>().id,
+      },
+      {
+        eventType: 'compensation.component-ended',
+        targetId: allowance.json<{ id: string }>().id,
+      },
+      {
+        eventType: 'compensation.salary-created',
+        targetId: salary.json<{ id: string }>().id,
+      },
+      {
+        eventType: 'compensation.salary-ended',
+        targetId: salary.json<{ id: string }>().id,
+      },
       { eventType: 'workforce.employee-created', targetId: employeeId },
       { eventType: 'workforce.employee-updated', targetId: employeeId },
       { eventType: 'workforce.employment-ended', targetId: employmentId },
@@ -392,6 +526,14 @@ async function cleanFixtures(pool: Pool): Promise<void> {
     await client.query(
       'DELETE FROM app.sessions WHERE user_account_id = ANY($1::uuid[])',
       [userIds],
+    );
+    await client.query(
+      'DELETE FROM app.compensation_components WHERE company_id = ANY($1::uuid[])',
+      [companyIds],
+    );
+    await client.query(
+      'DELETE FROM app.salaries WHERE company_id = ANY($1::uuid[])',
+      [companyIds],
     );
     await client.query(
       'DELETE FROM app.employments WHERE company_id = ANY($1::uuid[])',

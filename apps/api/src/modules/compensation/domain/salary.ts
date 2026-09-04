@@ -110,6 +110,26 @@ export function salaryIsEffectiveOn(
   return intervalContains(salary.effectivePeriod, date);
 }
 
+export function endSalary(
+  employment: Readonly<Employment>,
+  salary: Readonly<Salary>,
+  endsOn: string,
+): Readonly<Salary> {
+  if (salary.effectivePeriod.endsOn !== undefined) {
+    throw new DomainError(
+      'COMPENSATION_ALREADY_ENDED',
+      'An ended salary cannot be ended again',
+      { entity: 'Salary' },
+    );
+  }
+  const effectivePeriod = createDateInterval(
+    salary.effectivePeriod.startsOn,
+    parseLocalDate(endsOn),
+  );
+  assertPeriodWithinEmployment(employment, effectivePeriod);
+  return Object.freeze({ ...salary, effectivePeriod });
+}
+
 function invalidSalaryHistory(rule: string): DomainError {
   return new DomainError(
     'COMPENSATION_HISTORY_OVERLAP',

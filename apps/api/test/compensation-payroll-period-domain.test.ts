@@ -7,6 +7,8 @@ import {
   compensationComponentIsEffectiveOn,
   createCompensationComponent,
   createSalary,
+  endCompensationComponent,
+  endSalary,
   salaryIsEffectiveOn,
 } from '../src/modules/compensation/domain/index.js';
 import {
@@ -126,6 +128,20 @@ describe('effective-dated salary', () => {
       expect.objectContaining({ code: 'COMPENSATION_HISTORY_OVERLAP' }),
     );
   });
+
+  it('ends an open salary once and keeps it within employment', () => {
+    const employment = createFixtureEmployment();
+    const salary = createSalary(employment, {
+      amount: '10000.00',
+      id: salaryId,
+      startsOn: '2026-01-01',
+    });
+    const ended = endSalary(employment, salary, '2026-06-30');
+    expect(ended.effectivePeriod.endsOn).toBe('2026-06-30');
+    expect(() => endSalary(employment, ended, '2026-07-31')).toThrowError(
+      expect.objectContaining({ code: 'COMPENSATION_ALREADY_ENDED' }),
+    );
+  });
 });
 
 describe('allowances and deductions', () => {
@@ -192,6 +208,22 @@ describe('allowances and deductions', () => {
         startsOn: '2026-01-01',
       }),
     ).toThrowError();
+  });
+
+  it('ends an open component once', () => {
+    const employment = createFixtureEmployment();
+    const component = createCompensationComponent(employment, {
+      amount: '100.00',
+      code: 'LOAN',
+      id: componentId,
+      kind: 'deduction',
+      name: 'Loan repayment',
+      startsOn: '2026-01-01',
+    });
+    expect(
+      endCompensationComponent(employment, component, '2026-06-30')
+        .effectivePeriod.endsOn,
+    ).toBe('2026-06-30');
   });
 });
 
