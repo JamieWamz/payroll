@@ -17,6 +17,7 @@ import { companyWorkforceRoutes } from './routes/company-workforce.js';
 import { compensationRoutes } from './routes/compensation.js';
 import { healthRoutes } from './routes/health.js';
 import { payrollPeriodRoutes } from './routes/payroll-periods.js';
+import { statutoryConfigurationRoutes } from './routes/statutory-configurations.js';
 
 interface BuildAppOptions {
   database: Database;
@@ -87,6 +88,11 @@ export async function buildApp({
     prefix: '/api',
   });
   await app.register(payrollPeriodRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
+  await app.register(statutoryConfigurationRoutes, {
     database,
     environment,
     prefix: '/api',

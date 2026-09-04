@@ -40,6 +40,8 @@ Tenant-authorized payroll-period HTTP decisions are recorded in
 [ADR 0010](decisions/0010-tenant-authorized-payroll-period-http.md).
 Configurable Zambian calculation decisions are recorded in
 [ADR 0011](decisions/0011-configurable-zambian-monthly-calculator.md).
+Tenant-authorized statutory-configuration HTTP decisions are recorded in
+[ADR 0012](decisions/0012-tenant-authorized-statutory-configuration-http.md).
 
 ## Current Phase 2 boundary
 
@@ -78,6 +80,8 @@ this boundary. Compensation history, salary create/end, and allowance or
 deduction create/end routes use the same boundary. Client identity or
 permission headers are never accepted. Payroll-period list/create routes apply
 the same controls with `payroll.read` and `payroll.calculate` respectively.
+Statutory-configuration read/create/verify/retire routes apply the boundary
+with `statutory-config.read` and `statutory-config.verify`.
 
 The workforce foundation stores only company-scoped employee numbers, names,
 lifecycle state, position titles, and inclusive employment dates. Pure domain
@@ -101,12 +105,13 @@ force tenant RLS and deny runtime hard deletes.
 
 The statutory-configuration foundation stores effective-dated draft,
 verified, and retired evidence versions. Verification requires source records
-from ZRA, NAPSA, and NHIMA plus an active company membership and timestamp.
+from ZRA, NAPSA, and NHIMA, explicit reviewer attestation, plus an active
+company membership and timestamp.
 Database and domain rules prevent applicable-period overlap and prevent any
-verified parameters or sources from being rewritten. The records contain
-evidence-state placeholders only: no rates, bands, ceilings, calculation bases,
-or rounding behavior have been adopted. Research status is maintained in the
-[statutory source register](statutory-source-register.md).
+verified parameters or sources from being rewritten. Authorized APIs expose
+bounded history, detail, draft creation, verification, retirement, and sourced
+reference data. Reference values are configuration aids and never become active
+defaults. Research status is maintained in the [statutory source register](statutory-source-register.md).
 
 The payroll-run foundation creates a draft against one period and a verified
 configuration that covers that period. It stores selected-employee input and
@@ -119,9 +124,9 @@ components immutable. The injected calculator now has a configuration-driven
 Zambian monthly implementation, but run HTTP orchestration and an approved 2026
 configuration remain closed.
 
-Payroll calculation/finalization, statutory-configuration, report, and payslip HTTP routes
-remain closed until current company membership, RBAC, tenant context, CSRF
-enforcement, and append-only audit are integrated and tested for each command.
+Payroll calculation/finalization, report, and payslip HTTP routes remain closed
+until current company membership, RBAC, tenant context, CSRF enforcement, and
+append-only audit are integrated and tested for each command.
 Client-provided user or company headers are not an authentication mechanism and
 will not be introduced as a temporary shortcut.
 

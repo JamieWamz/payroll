@@ -7,9 +7,10 @@ and accounting firms.
 > **Phase 1 is complete and Phase 2 application work is in progress.** The
 > system now implements registration, login, secure session restoration, and
 > logout, plus tenant-authorized company, workforce, and effective-dated
-> compensation workflows and payroll-period creation/history. It does not yet
-> expose payroll calculation or finalization and has no approved 2026 statutory
-> configuration. The isolated calculator is not yet available through the API;
+> compensation workflows, payroll-period creation/history, and statutory
+> configuration administration. It does not yet expose payroll calculation or
+> finalization and has no approved 2026 statutory configuration. The isolated
+> calculator is not yet available through the API;
 > payslips and statutory reports are also not implemented. No unverified rate
 > should be used for real payroll. The current application is not production-ready.
 
@@ -48,6 +49,9 @@ and accounting firms.
 - Authenticated payroll-period history and creation workflows, including
   regular-period overlap prevention, explicit off-cycle periods, bounded
   filtering, CSRF protection, permissions, and atomic audit events.
+- Authenticated statutory-configuration list/detail/create/verify/retire
+  workflows with source evidence, reviewer attestation, optimistic versions,
+  immutable verified history, and official PAYE/contribution reference data.
 - Forced-RLS credential, server-side session, and append-only audit tables.
   The runtime role has no direct access to those tables; only a tenant-checked
   audit append function is currently exposed.
@@ -109,6 +113,8 @@ Tenant-authorized payroll-period HTTP decisions are recorded in
 [ADR 0010](docs/decisions/0010-tenant-authorized-payroll-period-http.md).
 Configurable Zambian calculation decisions are recorded in
 [ADR 0011](docs/decisions/0011-configurable-zambian-monthly-calculator.md).
+Tenant-authorized statutory-configuration HTTP decisions are recorded in
+[ADR 0012](docs/decisions/0012-tenant-authorized-statutory-configuration-http.md).
 The externally researched interaction direction is recorded in the
 [product design guidelines](docs/product-design-guidelines.md).
 
@@ -210,33 +216,38 @@ docker compose --env-file .env -f compose.yaml -f compose.dev.yaml up --detach p
 
 ## Endpoints
 
-| Runtime              | Address                                                                                 | Purpose                                                 |
-| -------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Host development web | `http://127.0.0.1:5173`                                                                 | Vite development server                                 |
-| Compose web          | `http://127.0.0.1:8080`                                                                 | Nginx static frontend and `/api` proxy                  |
-| API                  | `http://127.0.0.1:3000`                                                                 | Direct Fastify access                                   |
-| API liveness         | `/api/health/live`                                                                      | Confirms the API process can respond                    |
-| API readiness        | `/api/health/ready`                                                                     | Confirms the runtime DB role and `app` schema are ready |
-| Register owner       | `POST /api/auth/register`                                                               | Creates the first company owner and a secure session    |
-| Log in               | `POST /api/auth/login`                                                                  | Verifies credentials and creates a secure session       |
-| Restore session      | `GET /api/auth/session`                                                                 | Returns the active user and company memberships         |
-| Log out              | `POST /api/auth/logout`                                                                 | CSRF-checks and revokes the current session             |
-| Company profile      | `GET, PATCH /api/companies/:companyId`                                                  | Reads or renames an authorized company                  |
-| Employees            | `GET, POST /api/companies/:companyId/employees`                                         | Lists or creates employees                              |
-| Employee detail      | `GET, PATCH /api/companies/:companyId/employees/:employeeId`                            | Reads, edits, or archives an employee                   |
-| Add employment       | `POST /api/companies/:companyId/employees/:employeeId/employments`                      | Adds validated history                                  |
-| End employment       | `PATCH /api/companies/:companyId/employees/:employeeId/employments/:employmentId`       | Ends active employment                                  |
-| Compensation history | `GET /api/companies/:companyId/employments/:employmentId/compensation`                  | Lists salary and component history                      |
-| Add salary           | `POST /api/companies/:companyId/employments/:employmentId/salaries`                     | Adds an effective-dated monthly ZMW salary              |
-| End salary           | `PATCH /api/companies/:companyId/employments/:employmentId/salaries/:salaryId/end`      | Ends an open salary                                     |
-| Add component        | `POST /api/companies/:companyId/employments/:employmentId/components`                   | Adds a fixed allowance or deduction                     |
-| End component        | `PATCH /api/companies/:companyId/employments/:employmentId/components/:componentId/end` | Ends an open allowance or deduction                     |
-| Payroll periods      | `GET, POST /api/companies/:companyId/payroll-periods`                                   | Lists or creates regular and off-cycle periods          |
-| Web-container health | `http://127.0.0.1:8080/health`                                                          | Confirms Nginx can serve requests                       |
+| Runtime              | Address                                                                                      | Purpose                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Host development web | `http://127.0.0.1:5173`                                                                      | Vite development server                                   |
+| Compose web          | `http://127.0.0.1:8080`                                                                      | Nginx static frontend and `/api` proxy                    |
+| API                  | `http://127.0.0.1:3000`                                                                      | Direct Fastify access                                     |
+| API liveness         | `/api/health/live`                                                                           | Confirms the API process can respond                      |
+| API readiness        | `/api/health/ready`                                                                          | Confirms the runtime DB role and `app` schema are ready   |
+| Register owner       | `POST /api/auth/register`                                                                    | Creates the first company owner and a secure session      |
+| Log in               | `POST /api/auth/login`                                                                       | Verifies credentials and creates a secure session         |
+| Restore session      | `GET /api/auth/session`                                                                      | Returns the active user and company memberships           |
+| Log out              | `POST /api/auth/logout`                                                                      | CSRF-checks and revokes the current session               |
+| Company profile      | `GET, PATCH /api/companies/:companyId`                                                       | Reads or renames an authorized company                    |
+| Employees            | `GET, POST /api/companies/:companyId/employees`                                              | Lists or creates employees                                |
+| Employee detail      | `GET, PATCH /api/companies/:companyId/employees/:employeeId`                                 | Reads, edits, or archives an employee                     |
+| Add employment       | `POST /api/companies/:companyId/employees/:employeeId/employments`                           | Adds validated history                                    |
+| End employment       | `PATCH /api/companies/:companyId/employees/:employeeId/employments/:employmentId`            | Ends active employment                                    |
+| Compensation history | `GET /api/companies/:companyId/employments/:employmentId/compensation`                       | Lists salary and component history                        |
+| Add salary           | `POST /api/companies/:companyId/employments/:employmentId/salaries`                          | Adds an effective-dated monthly ZMW salary                |
+| End salary           | `PATCH /api/companies/:companyId/employments/:employmentId/salaries/:salaryId/end`           | Ends an open salary                                       |
+| Add component        | `POST /api/companies/:companyId/employments/:employmentId/components`                        | Adds a fixed allowance or deduction                       |
+| End component        | `PATCH /api/companies/:companyId/employments/:employmentId/components/:componentId/end`      | Ends an open allowance or deduction                       |
+| Payroll periods      | `GET, POST /api/companies/:companyId/payroll-periods`                                        | Lists or creates regular and off-cycle periods            |
+| Statutory versions   | `GET, POST /api/companies/:companyId/statutory-configurations`                               | Lists or creates evidence-backed configuration drafts     |
+| Statutory detail     | `GET /api/companies/:companyId/statutory-configurations/:configurationId`                    | Reads parameters, evidence, and verification state        |
+| Verify/retire rules  | `POST /api/companies/:companyId/statutory-configurations/:configurationId/{verify,retire}`   | Publishes or retires an immutable rule version            |
+| Statutory references | `GET /api/companies/:companyId/statutory-configurations/references/{zra-paye,contributions}` | Returns sourced configuration aids, never active defaults |
+| Web-container health | `http://127.0.0.1:8080/health`                                                               | Confirms Nginx can serve requests                         |
 
-State-changing company, workforce, compensation, and payroll-period requests require the CSRF token returned
-by authentication in both the `zampayroll_csrf` cookie and `X-CSRF-Token`
-header. A readiness failure returns HTTP `503` without returning the underlying
+State-changing company, workforce, compensation, payroll-period, and
+statutory-configuration requests require the CSRF token returned by
+authentication in both the `zampayroll_csrf` cookie and `X-CSRF-Token` header.
+A readiness failure returns HTTP `503` without returning the underlying
 database error to the client.
 
 ## Quality checks and tests
