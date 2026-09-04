@@ -10,8 +10,9 @@ implemented.
 
 > [!IMPORTANT]
 > There is no payroll engine or statutory calculation. PAYE, NAPSA, NHIMA,
-> payslips, and authorized business routes are not implemented. Cookie-session
-> authentication is implemented. Company, identity, workforce,
+> payslips, and payroll business routes are not implemented. Cookie-session
+> authentication and initial authorized company/workforce routes are
+> implemented. Company, identity, workforce,
 > compensation, payroll-period, and statutory-evidence records exist only as
 > internal foundations. Payroll-run lifecycle and snapshot persistence now
 > exist, but no statutory calculator or approved rates exist.
@@ -30,6 +31,8 @@ Payroll-run orchestration and finalization decisions are recorded in
 [ADR 0006](decisions/0006-payroll-run-lifecycle.md).
 Authentication runtime decisions are recorded in
 [ADR 0007](decisions/0007-authentication-runtime.md).
+Tenant-authorized company and workforce HTTP decisions are recorded in
+[ADR 0008](decisions/0008-tenant-authorized-company-workforce-http.md).
 
 ## Current Phase 2 boundary
 
@@ -55,6 +58,14 @@ double-submit CSRF check for logout. Narrow security-definer functions provision
 the first owner atomically and access credential/session records while direct
 runtime table access remains revoked. Successful registration, login, and
 logout and denied login attempts emit append-only audit events.
+
+The tenant authorization runtime opens row-level-security scope from a parsed
+company URL identifier, then resolves the opaque session, active company
+membership, active roles, and current permissions inside that same transaction.
+State-changing routes additionally validate the CSRF cookie/header/digest and
+append their success audit event atomically. Company read/name-update and
+employee list/create/detail plus employment-create routes now use this boundary;
+client identity or permission headers are never accepted.
 
 The workforce foundation stores only company-scoped employee numbers, names,
 lifecycle state, position titles, and inclusive employment dates. Pure domain
@@ -92,10 +103,11 @@ database and domain lifecycle guards make finalized runs, snapshots, and
 components immutable. This is orchestration only: there is still no PAYE,
 NAPSA, or NHIMA arithmetic implementation.
 
-Business HTTP routes remain closed until current company membership, RBAC,
-tenant context, CSRF enforcement, and append-only audit are integrated and
-tested for each command. Client-provided user or company headers are not an
-authentication mechanism and will not be introduced as a temporary shortcut.
+Compensation, payroll, statutory-configuration, report, and payslip HTTP routes
+remain closed until current company membership, RBAC, tenant context, CSRF
+enforcement, and append-only audit are integrated and tested for each command.
+Client-provided user or company headers are not an authentication mechanism and
+will not be introduced as a temporary shortcut.
 
 ## Current system
 

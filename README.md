@@ -6,10 +6,11 @@ and accounting firms.
 > [!WARNING]
 > **Phase 1 is complete and Phase 2 domain work is in progress.** The system
 > now implements registration, login, secure session restoration, and logout,
-> but does not yet expose employee or payroll business workflows or implement
-> Zambia statutory calculations, PAYE, NAPSA, NHIMA, payslips, or statutory
-> reports. No statutory rate should be inferred or used for real payroll. The
-> current application is not production-ready.
+> plus initial tenant-authorized company and workforce workflows. It does not
+> yet expose compensation or payroll operations or implement Zambia statutory
+> calculations, PAYE, NAPSA, NHIMA, payslips, or statutory reports. No
+> statutory rate should be inferred or used for real payroll. The current
+> application is not production-ready.
 
 ## What exists today
 
@@ -34,6 +35,11 @@ and accounting firms.
 - Server-side opaque sessions with idle and absolute expiration, HttpOnly
   SameSite cookies, independently generated CSRF tokens, session restoration,
   CSRF-checked logout, and authentication audit events.
+- Transaction-atomic tenant authorization that resolves each requested company
+  to a live membership and current role permissions, with CSRF checks and audit
+  writes for company and workforce mutations.
+- Authenticated company read/name-update plus employee list/create/detail and
+  employment-create HTTP workflows with bounded queries and conflict handling.
 - Forced-RLS credential, server-side session, and append-only audit tables.
   The runtime role has no direct access to those tables; only a tenant-checked
   audit append function is currently exposed.
@@ -81,6 +87,8 @@ Payroll-run orchestration and finalization decisions are recorded in
 [ADR 0006](docs/decisions/0006-payroll-run-lifecycle.md).
 Authentication runtime decisions are recorded in
 [ADR 0007](docs/decisions/0007-authentication-runtime.md).
+Tenant-authorized company and workforce HTTP decisions are recorded in
+[ADR 0008](docs/decisions/0008-tenant-authorized-company-workforce-http.md).
 The externally researched interaction direction is recorded in the
 [product design guidelines](docs/product-design-guidelines.md).
 
@@ -182,23 +190,27 @@ docker compose --env-file .env -f compose.yaml -f compose.dev.yaml up --detach p
 
 ## Endpoints
 
-| Runtime              | Address                        | Purpose                                                 |
-| -------------------- | ------------------------------ | ------------------------------------------------------- |
-| Host development web | `http://127.0.0.1:5173`        | Vite development server                                 |
-| Compose web          | `http://127.0.0.1:8080`        | Nginx static frontend and `/api` proxy                  |
-| API                  | `http://127.0.0.1:3000`        | Direct Fastify access                                   |
-| API liveness         | `/api/health/live`             | Confirms the API process can respond                    |
-| API readiness        | `/api/health/ready`            | Confirms the runtime DB role and `app` schema are ready |
-| Register owner       | `POST /api/auth/register`      | Creates the first company owner and a secure session    |
-| Log in               | `POST /api/auth/login`         | Verifies credentials and creates a secure session       |
-| Restore session      | `GET /api/auth/session`        | Returns the active user and company memberships         |
-| Log out              | `POST /api/auth/logout`        | CSRF-checks and revokes the current session             |
-| Web-container health | `http://127.0.0.1:8080/health` | Confirms Nginx can serve requests                       |
+| Runtime              | Address                                                            | Purpose                                                 |
+| -------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- |
+| Host development web | `http://127.0.0.1:5173`                                            | Vite development server                                 |
+| Compose web          | `http://127.0.0.1:8080`                                            | Nginx static frontend and `/api` proxy                  |
+| API                  | `http://127.0.0.1:3000`                                            | Direct Fastify access                                   |
+| API liveness         | `/api/health/live`                                                 | Confirms the API process can respond                    |
+| API readiness        | `/api/health/ready`                                                | Confirms the runtime DB role and `app` schema are ready |
+| Register owner       | `POST /api/auth/register`                                          | Creates the first company owner and a secure session    |
+| Log in               | `POST /api/auth/login`                                             | Verifies credentials and creates a secure session       |
+| Restore session      | `GET /api/auth/session`                                            | Returns the active user and company memberships         |
+| Log out              | `POST /api/auth/logout`                                            | CSRF-checks and revokes the current session             |
+| Company profile      | `GET, PATCH /api/companies/:companyId`                             | Reads or renames an authorized company                  |
+| Employees            | `GET, POST /api/companies/:companyId/employees`                    | Lists or creates employees                              |
+| Employee detail      | `GET /api/companies/:companyId/employees/:employeeId`              | Returns employment history                              |
+| Add employment       | `POST /api/companies/:companyId/employees/:employeeId/employments` | Adds validated history                                  |
+| Web-container health | `http://127.0.0.1:8080/health`                                     | Confirms Nginx can serve requests                       |
 
-Company and workforce records are not yet reachable through HTTP. Those routes
-remain closed until company-scoped authorization and audit middleware are
-implemented. A readiness failure returns HTTP `503` without returning the
-underlying database error to the client.
+State-changing company and workforce requests require the CSRF token returned
+by authentication in both the `zampayroll_csrf` cookie and `X-CSRF-Token`
+header. A readiness failure returns HTTP `503` without returning the underlying
+database error to the client.
 
 ## Quality checks and tests
 

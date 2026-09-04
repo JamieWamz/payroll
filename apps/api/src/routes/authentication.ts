@@ -1,4 +1,3 @@
-import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import { randomUUID } from 'node:crypto';
 import type { FastifyPluginAsync, FastifyReply } from 'fastify';
@@ -25,6 +24,8 @@ import type {
   Database,
   TenantTransaction,
 } from '../infrastructure/database.js';
+import { ApiError } from './api-error.js';
+import { csrfCookieName, sessionCookieName } from './authentication-cookies.js';
 
 interface AuthenticationRoutesOptions {
   database: Database;
@@ -60,8 +61,6 @@ interface SessionRecord {
   userAccountId: string;
 }
 
-const sessionCookieName = 'zampayroll_session';
-const csrfCookieName = 'zampayroll_csrf';
 const registrationSchema = z
   .object({
     companyCode: z.string().max(128),
@@ -83,7 +82,6 @@ export const authenticationRoutes: FastifyPluginAsync<
     options.passwordBlocklist ?? commonPasswordBlocklist;
   const dummyPasswordHash = await hashPassword(dummyPassword);
 
-  await app.register(cookie);
   await app.register(rateLimit, { global: false });
 
   app.post(
@@ -515,14 +513,4 @@ function isPostgresError(error: unknown, code: string): boolean {
     'code' in error &&
     error.code === code
   );
-}
-
-export class ApiError extends Error {
-  readonly statusCode: number;
-
-  constructor(statusCode: number, message: string) {
-    super(message);
-    this.name = 'ApiError';
-    this.statusCode = statusCode;
-  }
 }

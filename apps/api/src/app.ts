@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import Fastify, {
   type FastifyError,
@@ -12,6 +13,7 @@ import type { Database } from './infrastructure/database.js';
 import type { PasswordBlocklist } from './modules/identity-access/security/index.js';
 import { DomainError } from './shared/domain/domain-error.js';
 import { authenticationRoutes } from './routes/authentication.js';
+import { companyWorkforceRoutes } from './routes/company-workforce.js';
 import { healthRoutes } from './routes/health.js';
 
 interface BuildAppOptions {
@@ -43,6 +45,7 @@ export async function buildApp({
     credentials: true,
     origin: environment.WEB_ORIGIN,
   });
+  await app.register(cookie);
 
   app.setErrorHandler(
     async (error: FastifyError, request, reply): Promise<void> => {
@@ -69,6 +72,11 @@ export async function buildApp({
     database,
     environment,
     ...(passwordBlocklist === undefined ? {} : { passwordBlocklist }),
+    prefix: '/api',
+  });
+  await app.register(companyWorkforceRoutes, {
+    database,
+    environment,
     prefix: '/api',
   });
 
