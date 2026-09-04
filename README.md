@@ -8,10 +8,10 @@ and accounting firms.
 > system now implements registration, login, secure session restoration, and
 > logout, plus tenant-authorized company, workforce, and effective-dated
 > compensation workflows and payroll-period creation/history. It does not yet
-> expose payroll calculation or finalization, or implement Zambia statutory
-> calculations, PAYE, NAPSA, NHIMA, payslips, or statutory reports. No
-> statutory rate should be inferred or used for real payroll. The current
-> application is not production-ready.
+> expose payroll calculation or finalization and has no approved 2026 statutory
+> configuration. The isolated calculator is not yet available through the API;
+> payslips and statutory reports are also not implemented. No unverified rate
+> should be used for real payroll. The current application is not production-ready.
 
 ## What exists today
 
@@ -67,8 +67,14 @@ and accounting firms.
 - Draft, calculated, and finalized payroll-run domain and database lifecycles;
   pinned period/configuration references; employee input/result snapshots;
   normalized breakdown components; reconciliation checks; review
-  recalculation; and immutable finalized history. The injected calculator has
-  no statutory implementation yet.
+  recalculation; and immutable finalized history.
+- A deterministic Zambian monthly calculator implementing cumulative
+  progressive PAYE, separately capped employee/employer NAPSA contributions,
+  NHIMA contributions, auditable component treatment, signed PAYE refunds, and
+  exact integer rounding. All bands, rates, caps, and treatments come from the
+  pinned verified configuration; no configuration is silently built into the
+  engine. The official ZRA 2025 bands are retained as a configuration reference,
+  not as an active 2026 rule set.
 - Unit, API, frontend, and PostgreSQL integration test foundations.
 - Shared linting, formatting, type-checking, build, and CI gates.
 
@@ -101,6 +107,8 @@ Tenant-authorized compensation HTTP decisions are recorded in
 [ADR 0009](docs/decisions/0009-tenant-authorized-compensation-http.md).
 Tenant-authorized payroll-period HTTP decisions are recorded in
 [ADR 0010](docs/decisions/0010-tenant-authorized-payroll-period-http.md).
+Configurable Zambian calculation decisions are recorded in
+[ADR 0011](docs/decisions/0011-configurable-zambian-monthly-calculator.md).
 The externally researched interaction direction is recorded in the
 [product design guidelines](docs/product-design-guidelines.md).
 

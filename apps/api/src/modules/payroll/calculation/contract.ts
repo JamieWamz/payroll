@@ -4,11 +4,7 @@ import type {
   PayrollCalculationOutcome,
 } from './types.js';
 
-/**
- * Pure calculation boundary. Phase 2 intentionally provides no implementation
- * until statutory configuration and rounding behavior are authoritatively
- * verified and independently reviewed.
- */
+/** Pure calculation boundary used by versioned, evidence-backed calculators. */
 export interface PayrollCalculator {
   calculate(
     input: DeepReadonly<PayrollCalculationInput>,

@@ -69,6 +69,14 @@ export interface PayrollPeriodSnapshot {
   readonly startsOn: LocalDate;
 }
 
+export interface PayrollStatutoryContext {
+  readonly napsaEmployeeContributionBeforePeriod: Readonly<Money>;
+  readonly napsaEmployerContributionBeforePeriod: Readonly<Money>;
+  readonly napsaEarningsBeforePeriod: Readonly<Money>;
+  readonly payeBeforePeriod: Readonly<Money>;
+  readonly taxableIncomeBeforePeriod: Readonly<Money>;
+}
+
 export interface PayrollCalculationInput {
   readonly calculationVersion: CalculationVersion;
   readonly compensation: readonly CompensationComponentSnapshot[];
@@ -77,6 +85,7 @@ export interface PayrollCalculationInput {
   readonly period: PayrollPeriodSnapshot;
   readonly roundingPolicy: RoundingPolicyIdentifier;
   readonly statutoryConfiguration: VerifiedStatutoryConfigurationSnapshot;
+  readonly statutoryContext: PayrollStatutoryContext;
 }
 
 export interface PayrollBreakdownLine {

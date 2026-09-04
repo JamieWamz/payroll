@@ -9,13 +9,14 @@ a feature, domain model, statutory rule, or security control has been
 implemented.
 
 > [!IMPORTANT]
-> There is no statutory calculation. PAYE, NAPSA, NHIMA,
-> payslips, and payroll calculation/finalization routes are not implemented.
+> There is no approved 2026 statutory configuration. A deterministic,
+> configuration-driven monthly calculator exists but is not exposed through a
+> payroll route. Payslips and payroll calculation/finalization routes are not implemented.
 > Cookie-session authentication and authorized company, workforce,
 > compensation, and payroll-period routes are implemented. Company, identity,
 > workforce, and statutory-evidence records otherwise remain internal
 > foundations. Payroll-run lifecycle and snapshot persistence exist, but no
-> statutory calculator or approved rates exist.
+> unverified parameters may be activated.
 
 The sequencing and security decisions for Phase 2 are recorded in
 [ADR 0001](decisions/0001-phase-2-domain-boundaries.md). Authentication details
@@ -37,14 +38,18 @@ Tenant-authorized compensation HTTP decisions are recorded in
 [ADR 0009](decisions/0009-tenant-authorized-compensation-http.md).
 Tenant-authorized payroll-period HTTP decisions are recorded in
 [ADR 0010](decisions/0010-tenant-authorized-payroll-period-http.md).
+Configurable Zambian calculation decisions are recorded in
+[ADR 0011](decisions/0011-configurable-zambian-monthly-calculator.md).
 
 ## Current Phase 2 boundary
 
-Phase 2 begins with framework-independent value objects and an immutable
-payroll-calculation contract. The contract defines the evidence a future
-calculator must receive and return; it is not a calculator implementation.
-There are no statutory constants, default rounding behavior, calculate route,
-or finalization route.
+Phase 2 began with framework-independent value objects and an immutable
+payroll-calculation contract. A pure calculator now implements configured
+monthly progressive PAYE and contribution mechanics. It accepts only the
+reviewed calculation version and rounding policy, requires explicit treatment
+for every earning code, and uses cumulative PAYE and month-to-date NAPSA
+context. There is no active default configuration, calculate route, or
+finalization route.
 
 The current persistence slice adds global user accounts plus company-scoped
 companies, memberships, roles, assignments, and permission identifiers. Every
@@ -110,8 +115,9 @@ orchestrator calls an injected calculator and rejects incomplete employee
 batches, changed references, non-ZMW or negative results, and totals that do
 not reconcile. Review calculations can be replaced before finalization;
 database and domain lifecycle guards make finalized runs, snapshots, and
-components immutable. This is orchestration only: there is still no PAYE,
-NAPSA, or NHIMA arithmetic implementation.
+components immutable. The injected calculator now has a configuration-driven
+Zambian monthly implementation, but run HTTP orchestration and an approved 2026
+configuration remain closed.
 
 Payroll calculation/finalization, statutory-configuration, report, and payslip HTTP routes
 remain closed until current company membership, RBAC, tenant context, CSRF
@@ -256,34 +262,34 @@ code must not depend on HTTP, React, Fastify, PostgreSQL, or Docker.
 
 Current and candidate module boundaries are:
 
-| Module                  | Future ownership                                                                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                                                                                          |
-| Company                 | Company profile, payroll settings, and statutory identifiers                                                                                                             |
-| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed)                                                                     |
-| Compensation            | Effective-dated salaries, allowances, and deductions with authorized history and lifecycle workflows                                                                     |
-| Payroll                 | Authorized period creation/history plus run snapshot, calculation orchestration, and finalization foundations; arithmetic, corrections, and reversals remain future work |
-| Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                                                                                    |
-| Documents and reporting | Payslips, statutory schedules, and configurable bank exports                                                                                                             |
-| Audit                   | Append-oriented records of security-sensitive and payroll-sensitive actions                                                                                              |
+| Module                  | Future ownership                                                                                                                                                                               |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                                                                                                                |
+| Company                 | Company profile, payroll settings, and statutory identifiers                                                                                                                                   |
+| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed)                                                                                           |
+| Compensation            | Effective-dated salaries, allowances, and deductions with authorized history and lifecycle workflows                                                                                           |
+| Payroll                 | Authorized period creation/history, run snapshot/finalization foundations, and isolated configurable monthly arithmetic; run HTTP orchestration, corrections, and reversals remain future work |
+| Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                                                                                                          |
+| Documents and reporting | Payslips, statutory schedules, and configurable bank exports                                                                                                                                   |
+| Audit                   | Append-oriented records of security-sensitive and payroll-sensitive actions                                                                                                                    |
 
 Cross-module database access should not bypass module invariants. APIs must
 validate untrusted inputs, application services must authorize company-scoped
 operations, and the database must enforce durable invariants where practical.
 
-## Payroll calculation boundary — Future
+## Payroll calculation boundary
 
-The payroll calculation engine will be an isolated, deterministic domain
+The payroll calculation engine is an isolated, deterministic domain
 component. It must not depend on the UI, HTTP requests, wall-clock time,
 database connections, or mutable global state.
 
-Conceptually, it will accept employee/employment facts, compensation,
+It accepts employee/employment facts, compensation,
 deductions, a payroll period, and an explicitly selected statutory
 configuration. It will return a complete calculation breakdown containing
 gross pay, taxable income, PAYE, NAPSA, NHIMA, other deductions, net pay, and
 applicable employer contributions.
 
-The following constraints apply when this future work begins:
+The following constraints apply:
 
 - Money representation, rounding order, and boundary behavior must be explicit
   and tested.
@@ -297,8 +303,9 @@ The following constraints apply when this future work begins:
 - Results should be immutable values; persistence and presentation should
   consume them without recalculating them differently.
 
-The immutable input/output contract exists, but none of those statutory rules
-or calculations exists yet.
+The immutable contract and configurable monthly calculation mechanics exist.
+No rules become operational until they are stored as a reviewed, verified,
+effective-dated configuration and pinned into a payroll run.
 
 ## Finalization and audit boundary — Future
 
@@ -314,9 +321,9 @@ events without copying unnecessary payroll or authentication secrets into
 logs. Audit records must include reliable actor, tenant, event, target, and
 time context.
 
-The append-only storage and bounded event foundations exist, but no business or
-authentication workflow emits audit events yet. Finalized payroll is not
-implemented.
+Append-only storage and authenticated company, workforce, compensation, and
+payroll-period audit integration exist. Payroll calculation and finalization
+events remain closed with those HTTP workflows.
 
 ## Testing strategy
 
@@ -336,9 +343,11 @@ semantics, history overlap, termination, guarded archival, and period
 scheduling. The root quality gate runs formatting, linting, type checking,
 tests, and builds.
 
-Future domain tests must cover zero and low income, normal salaries,
-allowances, deductions, statutory and rounding boundaries, configuration
-changes, multiple employees, reproducibility, and finalized-run immutability.
+Calculation domain tests cover zero and low income, normal salaries,
+allowances, deductions, progressive boundaries, adjustable percentages,
+contribution caps, cumulative/off-cycle context, PAYE refunds, malformed
+configurations, reconciliation, and finalized-run immutability. Future tests
+must add every approved special case and statutory boundary.
 API and database tests must accompany validation, authorization, persistence,
 and migration work.
 

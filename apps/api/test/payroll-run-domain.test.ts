@@ -114,6 +114,13 @@ function createInput(selectedEmployeeId = employeeId): PayrollCalculationInput {
       verificationStatus: 'verified',
       version: configurationVersion,
     },
+    statutoryContext: {
+      napsaEmployeeContributionBeforePeriod: amount(0n),
+      napsaEmployerContributionBeforePeriod: amount(0n),
+      napsaEarningsBeforePeriod: amount(0n),
+      payeBeforePeriod: amount(0n),
+      taxableIncomeBeforePeriod: amount(0n),
+    },
   };
 }
 

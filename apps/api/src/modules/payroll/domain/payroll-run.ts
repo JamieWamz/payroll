@@ -286,18 +286,29 @@ function assertCalculationOutcome(
     throw calculationMismatch('outcome_reference');
   }
 
-  const directAmounts = [
+  const nonnegativeDirectAmounts = [
     outcome.grossPay,
     outcome.taxableIncome,
-    outcome.paye,
     outcome.napsa,
     outcome.nhima,
     outcome.otherDeductions,
     outcome.netPay,
-    ...outcome.breakdown.map((line) => line.amount),
+    ...outcome.breakdown
+      .filter((line) => line.code !== 'PAYE')
+      .map((line) => line.amount),
     ...outcome.employerContributions.map((item) => item.amount),
   ];
-  directAmounts.forEach(assertZambianNonnegativeMoney);
+  nonnegativeDirectAmounts.forEach(assertZambianNonnegativeMoney);
+  assertZambianMoney(outcome.paye);
+  const payeLines = outcome.breakdown.filter((line) => line.code === 'PAYE');
+  if (
+    payeLines.length !== 1 ||
+    payeLines[0]?.kind !== 'statutory_deduction' ||
+    payeLines[0].amount.minorUnits !== outcome.paye.minorUnits
+  ) {
+    throw calculationMismatch('paye_breakdown');
+  }
+  assertZambianMoney(payeLines[0].amount);
 
   const earnings = sumMinorUnits(
     outcome.breakdown
@@ -343,11 +354,17 @@ function assertCalculationOutcome(
 }
 
 function assertZambianNonnegativeMoney(money: DeepReadonly<Money>): void {
+  assertZambianMoney(money);
+  if (money.minorUnits < 0n) {
+    throw calculationMismatch('invalid_money');
+  }
+}
+
+function assertZambianMoney(money: DeepReadonly<Money>): void {
   if (
     money.currency !== 'ZMW' ||
     money.scale !== 2 ||
-    typeof money.minorUnits !== 'bigint' ||
-    money.minorUnits < 0n
+    typeof money.minorUnits !== 'bigint'
   ) {
     throw calculationMismatch('invalid_money');
   }
