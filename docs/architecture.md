@@ -10,10 +10,11 @@ implemented.
 
 > [!IMPORTANT]
 > There is no payroll engine or statutory calculation. PAYE, NAPSA, NHIMA,
-> payslips, authentication requests, authorized business routes, and finalized
-> payroll runs are not implemented. Company, identity, workforce,
+> payslips, authentication requests, and authorized business routes are not
+> implemented. Company, identity, workforce,
 > compensation, payroll-period, and statutory-evidence records exist only as
-> internal domain and persistence foundations. No statutory rates are approved.
+> internal foundations. Payroll-run lifecycle and snapshot persistence now
+> exist, but no statutory calculator or approved rates exist.
 
 The sequencing and security decisions for Phase 2 are recorded in
 [ADR 0001](decisions/0001-phase-2-domain-boundaries.md). Authentication details
@@ -25,6 +26,8 @@ Compensation and payroll-period decisions are recorded in
 [ADR 0004](decisions/0004-compensation-payroll-period-foundation.md).
 Statutory evidence and verification decisions are recorded in
 [ADR 0005](decisions/0005-statutory-configuration-evidence.md).
+Payroll-run orchestration and finalization decisions are recorded in
+[ADR 0006](decisions/0006-payroll-run-lifecycle.md).
 
 ## Current Phase 2 boundary
 
@@ -77,6 +80,16 @@ verified parameters or sources from being rewritten. The records contain
 evidence-state placeholders only: no rates, bands, ceilings, calculation bases,
 or rounding behavior have been adopted. Research status is maintained in the
 [statutory source register](statutory-source-register.md).
+
+The payroll-run foundation creates a draft against one period and a verified
+configuration that covers that period. It stores selected-employee input and
+result snapshots plus normalized calculation breakdown lines. The pure run
+orchestrator calls an injected calculator and rejects incomplete employee
+batches, changed references, non-ZMW or negative results, and totals that do
+not reconcile. Review calculations can be replaced before finalization;
+database and domain lifecycle guards make finalized runs, snapshots, and
+components immutable. This is orchestration only: there is still no PAYE,
+NAPSA, or NHIMA arithmetic implementation.
 
 Business HTTP routes remain closed until server-side authentication, CSRF
 protection, current company membership, RBAC, tenant context, and append-only
@@ -163,14 +176,14 @@ so connection details are not deliberately included in that event.
 
 The current roles and schemas separate bootstrap, DDL, and runtime access:
 
-| Identity/schema                              | Current responsibility                                                                                                                                                                                 |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                                                                             |
-| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                                                                           |
-| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                                                                    |
-| `app`                                        | Version-controlled tenant, identity, credential, session, audit, workforce, compensation, payroll-period, and statutory-evidence foundations. It contains no payroll-run or calculation-result tables. |
-| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                                                                            |
-| `public`                                     | Default public access and schema creation are revoked.                                                                                                                                                 |
+| Identity/schema                              | Current responsibility                                                                                                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                                          |
+| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                                        |
+| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                                 |
+| `app`                                        | Version-controlled tenant, identity, credential, session, audit, workforce, compensation, payroll-period, statutory-evidence, and payroll-run snapshot foundations. |
+| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                                         |
+| `public`                                     | Default public access and schema creation are revoked.                                                                                                              |
 
 The migrator's default privileges grant the runtime role table
 `SELECT`/`INSERT`/`UPDATE`, sequence `USAGE`/`SELECT`, and function `EXECUTE`
@@ -221,16 +234,16 @@ code must not depend on HTTP, React, Fastify, PostgreSQL, or Docker.
 
 Current and candidate module boundaries are:
 
-| Module                  | Future ownership                                                                                                              |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                                               |
-| Company                 | Company profile, payroll settings, and statutory identifiers                                                                  |
-| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed)                          |
-| Compensation            | Effective-dated salaries, allowances, and deductions (foundation implemented; workflows remain closed)                        |
-| Payroll                 | Periods (foundation implemented), runs, employee results, calculation orchestration, finalization, corrections, and reversals |
-| Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                                         |
-| Documents and reporting | Payslips, statutory schedules, and configurable bank exports                                                                  |
-| Audit                   | Append-oriented records of security-sensitive and payroll-sensitive actions                                                   |
+| Module                  | Future ownership                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                                                                        |
+| Company                 | Company profile, payroll settings, and statutory identifiers                                                                                           |
+| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed)                                                   |
+| Compensation            | Effective-dated salaries, allowances, and deductions (foundation implemented; workflows remain closed)                                                 |
+| Payroll                 | Periods, run snapshots, calculation orchestration, and finalization foundations implemented; arithmetic, corrections, and reversals remain future work |
+| Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                                                                  |
+| Documents and reporting | Payslips, statutory schedules, and configurable bank exports                                                                                           |
+| Audit                   | Append-oriented records of security-sensitive and payroll-sensitive actions                                                                            |
 
 Cross-module database access should not bypass module invariants. APIs must
 validate untrusted inputs, application services must authorize company-scoped

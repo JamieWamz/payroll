@@ -6,7 +6,8 @@ and accounting firms.
 > [!WARNING]
 > **Phase 1 is complete and Phase 2 domain work is in progress.** The system
 > does not yet implement authentication requests, employee workflows, payroll
-> calculations, PAYE, NAPSA, NHIMA, payslips, or statutory reports. The new
+> Zambia statutory calculations, PAYE, NAPSA, NHIMA, payslips, or statutory
+> reports. The new
 > company, identity, workforce, compensation, payroll-period, and statutory
 > evidence foundations are internal only and have no business HTTP routes. No
 > statutory rate should be inferred or used for real payroll. The current
@@ -48,6 +49,11 @@ and accounting firms.
   NHIMA source evidence, human verification attribution, immutable verified
   history, tenant isolation, and concurrent overlap prevention. This layer
   deliberately contains no approved rates yet.
+- Draft, calculated, and finalized payroll-run domain and database lifecycles;
+  pinned period/configuration references; employee input/result snapshots;
+  normalized breakdown components; reconciliation checks; review
+  recalculation; and immutable finalized history. The injected calculator has
+  no statutory implementation yet.
 - Unit, API, frontend, and PostgreSQL integration test foundations.
 - Shared linting, formatting, type-checking, build, and CI gates.
 
@@ -70,6 +76,8 @@ Compensation and payroll-period decisions are recorded in
 Statutory evidence decisions and current source gaps are recorded in
 [ADR 0005](docs/decisions/0005-statutory-configuration-evidence.md) and the
 [statutory source register](docs/statutory-source-register.md).
+Payroll-run orchestration and finalization decisions are recorded in
+[ADR 0006](docs/decisions/0006-payroll-run-lifecycle.md).
 The externally researched interaction direction is recorded in the
 [product design guidelines](docs/product-design-guidelines.md).
 
