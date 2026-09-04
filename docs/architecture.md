@@ -11,8 +11,9 @@ implemented.
 > [!IMPORTANT]
 > There is no payroll engine or statutory calculation. PAYE, NAPSA, NHIMA,
 > payslips, authentication requests, authorized business routes, and finalized
-> payroll runs are not implemented. Company, identity, and minimal workforce
-> records exist only as internal domain and persistence foundations.
+> payroll runs are not implemented. Company, identity, workforce,
+> compensation, and payroll-period records exist only as internal domain and
+> persistence foundations.
 
 The sequencing and security decisions for Phase 2 are recorded in
 [ADR 0001](decisions/0001-phase-2-domain-boundaries.md). Authentication details
@@ -20,6 +21,8 @@ are recorded in
 [ADR 0002](decisions/0002-authentication-security-foundation.md), and workforce
 details are recorded in
 [ADR 0003](decisions/0003-workforce-foundation.md).
+Compensation and payroll-period decisions are recorded in
+[ADR 0004](decisions/0004-compensation-payroll-period-foundation.md).
 
 ## Current Phase 2 boundary
 
@@ -54,7 +57,15 @@ an employment remains open. Composite database references prevent an
 employment from pointing at another company's employee; forced RLS hides both
 tables without transaction tenant context. The database also permits at most
 one open employment period per employee. No national identifier, bank detail,
-contact detail, compensation, statutory identifier, or employee route exists.
+contact detail, statutory identifier, or employee route exists.
+
+The compensation foundation adds employment-bound, effective-dated monthly
+ZMW salaries plus positive fixed-per-period allowances and deductions. Domain
+checks and serialized database triggers reject overlapping salary periods and
+matching component periods. Component records deliberately contain no guessed
+taxability behavior. Explicit regular and off-cycle payroll periods carry a
+separate payment date; regular periods cannot overlap within one company.
+These tables also force tenant RLS and deny runtime hard deletes.
 
 Business HTTP routes remain closed until server-side authentication, CSRF
 protection, current company membership, RBAC, tenant context, and append-only
@@ -141,14 +152,14 @@ so connection details are not deliberately included in that event.
 
 The current roles and schemas separate bootstrap, DDL, and runtime access:
 
-| Identity/schema                              | Current responsibility                                                                                                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                                          |
-| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                                        |
-| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                                 |
-| `app`                                        | Version-controlled application objects. It contains tenant, identity, credential, session, audit, and workforce foundations, but no compensation or payroll tables. |
-| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                                         |
-| `public`                                     | Default public access and schema creation are revoked.                                                                                                              |
+| Identity/schema                              | Current responsibility                                                                                                                                                             |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_USER` (default `zampayroll_admin`) | Initial cluster/database bootstrap and container health query. It is not used by the API or migration job.                                                                         |
+| `zampayroll_migrator`                        | Login role that owns application DDL, creates migration metadata, and applies version-controlled migrations.                                                                       |
+| `zampayroll_app`                             | Restricted login used by the API and database integration tests. It cannot create schemas, application tables, or temporary tables.                                                |
+| `app`                                        | Version-controlled tenant, identity, credential, session, audit, workforce, compensation, and payroll-period foundations. It contains no payroll-run or calculation-result tables. |
+| `zampayroll_internal`                        | Migration-tool metadata. The runtime role cannot access it.                                                                                                                        |
+| `public`                                     | Default public access and schema creation are revoked.                                                                                                                             |
 
 The migrator's default privileges grant the runtime role table
 `SELECT`/`INSERT`/`UPDATE`, sequence `USAGE`/`SELECT`, and function `EXECUTE`
@@ -199,16 +210,16 @@ code must not depend on HTTP, React, Fastify, PostgreSQL, or Docker.
 
 Current and candidate module boundaries are:
 
-| Module                  | Future ownership                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                      |
-| Company                 | Company profile, payroll settings, and statutory identifiers                                         |
-| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed) |
-| Compensation            | Salaries, allowances, and deductions                                                                 |
-| Payroll                 | Periods, runs, employee results, calculation orchestration, finalization, corrections, and reversals |
-| Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                |
-| Documents and reporting | Payslips, statutory schedules, and configurable bank exports                                         |
-| Audit                   | Append-oriented records of security-sensitive and payroll-sensitive actions                          |
+| Module                  | Future ownership                                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                                               |
+| Company                 | Company profile, payroll settings, and statutory identifiers                                                                  |
+| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed)                          |
+| Compensation            | Effective-dated salaries, allowances, and deductions (foundation implemented; workflows remain closed)                        |
+| Payroll                 | Periods (foundation implemented), runs, employee results, calculation orchestration, finalization, corrections, and reversals |
+| Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                                         |
+| Documents and reporting | Payslips, statutory schedules, and configurable bank exports                                                                  |
+| Audit                   | Append-oriented records of security-sensitive and payroll-sensitive actions                                                   |
 
 Cross-module database access should not bypass module invariants. APIs must
 validate untrusted inputs, application services must authorize company-scoped
@@ -240,7 +251,8 @@ The following constraints apply when this future work begins:
 - Results should be immutable values; persistence and presentation should
   consume them without recalculating them differently.
 
-None of those rules or calculations exists yet.
+The immutable input/output contract exists, but none of those statutory rules
+or calculations exists yet.
 
 ## Finalization and audit boundary — Future
 
@@ -268,12 +280,15 @@ privileges when `TEST_DATABASE_URL` is supplied. With both test database URLs,
 the integration suite also verifies forced RLS, tenant visibility, transaction
 context cleanup, composite cross-tenant references, lifecycle/value
 constraints, restricted deletes, global-user deny defaults, credential/session
-table denial, tenant-checked audit appends, workforce tenant isolation, and
-cross-company employment rejection. Security unit tests cover the password
-policy contract, Argon2id parameters, opaque tokens, authorization, and bounded
-metadata. Workforce tests cover normalized employee identity, inclusive date
-semantics, history overlap, termination, and guarded archival. The root quality
-gate runs formatting, linting, type checking, tests, and builds.
+table denial, tenant-checked audit appends, workforce tenant isolation,
+cross-company employment rejection, compensation ownership, effective-date
+containment, overlap protection, payroll-period overlap rules, and runtime
+delete denial. Security unit tests cover the password policy contract,
+Argon2id parameters, opaque tokens, authorization, and bounded metadata.
+Workforce and compensation tests cover normalized values, inclusive date
+semantics, history overlap, termination, guarded archival, and period
+scheduling. The root quality gate runs formatting, linting, type checking,
+tests, and builds.
 
 Future domain tests must cover zero and low income, normal salaries,
 allowances, deductions, statutory and rounding boundaries, configuration

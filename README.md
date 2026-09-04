@@ -7,8 +7,8 @@ and accounting firms.
 > **Phase 1 is complete and Phase 2 domain work is in progress.** The system
 > does not yet implement authentication requests, employee workflows, payroll
 > calculations, PAYE, NAPSA, NHIMA, payslips, or statutory reports. The new
-> company, identity, and workforce foundations are internal only and have no
-> business HTTP routes. No statutory rate in this repository should be
+> company, identity, workforce, compensation, and payroll-period foundations
+> are internal only and have no business HTTP routes. No statutory rate should be
 > inferred or used for real payroll. The current application is not
 > production-ready.
 
@@ -40,6 +40,10 @@ and accounting firms.
 - Tenant-isolated employee and employment tables with composite cross-company
   references, forced RLS, one open employment per employee, and no runtime
   hard deletes.
+- Effective-dated monthly ZMW salaries and fixed-per-period allowances and
+  deductions, with employment-bound dates and concurrent overlap protection.
+- Explicit regular and off-cycle payroll periods with separate payment dates;
+  regular periods cannot overlap within a company.
 - Unit, API, frontend, and PostgreSQL integration test foundations.
 - Shared linting, formatting, type-checking, build, and CI gates.
 
@@ -57,6 +61,10 @@ are recorded in
 [ADR 0002](docs/decisions/0002-authentication-security-foundation.md).
 Workforce data-minimization and employment-history decisions are recorded in
 [ADR 0003](docs/decisions/0003-workforce-foundation.md).
+Compensation and payroll-period decisions are recorded in
+[ADR 0004](docs/decisions/0004-compensation-payroll-period-foundation.md).
+The externally researched interaction direction is recorded in the
+[product design guidelines](docs/product-design-guidelines.md).
 
 ## Technology
 
