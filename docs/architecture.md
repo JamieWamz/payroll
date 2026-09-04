@@ -10,8 +10,8 @@ implemented.
 
 > [!IMPORTANT]
 > There is no payroll engine or statutory calculation. PAYE, NAPSA, NHIMA,
-> payslips, authentication requests, and authorized business routes are not
-> implemented. Company, identity, workforce,
+> payslips, and authorized business routes are not implemented. Cookie-session
+> authentication is implemented. Company, identity, workforce,
 > compensation, payroll-period, and statutory-evidence records exist only as
 > internal foundations. Payroll-run lifecycle and snapshot persistence now
 > exist, but no statutory calculator or approved rates exist.
@@ -28,6 +28,8 @@ Statutory evidence and verification decisions are recorded in
 [ADR 0005](decisions/0005-statutory-configuration-evidence.md).
 Payroll-run orchestration and finalization decisions are recorded in
 [ADR 0006](decisions/0006-payroll-run-lifecycle.md).
+Authentication runtime decisions are recorded in
+[ADR 0007](decisions/0007-authentication-runtime.md).
 
 ## Current Phase 2 boundary
 
@@ -45,15 +47,14 @@ sees no tenant records, and commit or rollback clears the setting before the
 pooled connection can be reused. Global user accounts remain invisible to the
 runtime role until the authentication architecture owns their access.
 
-The authentication foundation now provides an Argon2id password-verifier
-adapter, an injected password-blocklist contract, independently generated
-opaque session and CSRF tokens, immutable authorization principals, and a
-bounded audit-event contract that rejects secret-bearing metadata keys.
-Credential and server-side session tables have forced RLS and no direct runtime
-table privileges. A security-definer function is the only current runtime path
-into the append-only audit table and rejects tenant IDs that differ from the
-transaction context. These are internal primitives: credential/session access,
-cookie delivery, throttling, and authentication routes remain closed.
+The authentication runtime exposes registration, login, session restoration,
+and logout. It applies Argon2id verification, injectable password blocking,
+generic credential failures, endpoint throttling, bounded lockout, opaque
+server-side sessions, separate idle/absolute expiry, SameSite cookies, and a
+double-submit CSRF check for logout. Narrow security-definer functions provision
+the first owner atomically and access credential/session records while direct
+runtime table access remains revoked. Successful registration, login, and
+logout and denied login attempts emit append-only audit events.
 
 The workforce foundation stores only company-scoped employee numbers, names,
 lifecycle state, position titles, and inclusive employment dates. Pure domain
@@ -91,11 +92,10 @@ database and domain lifecycle guards make finalized runs, snapshots, and
 components immutable. This is orchestration only: there is still no PAYE,
 NAPSA, or NHIMA arithmetic implementation.
 
-Business HTTP routes remain closed until server-side authentication, CSRF
-protection, current company membership, RBAC, tenant context, and append-only
-audit are implemented and tested. Client-provided user or company headers are
-not an authentication mechanism and will not be introduced as a temporary
-shortcut.
+Business HTTP routes remain closed until current company membership, RBAC,
+tenant context, CSRF enforcement, and append-only audit are integrated and
+tested for each command. Client-provided user or company headers are not an
+authentication mechanism and will not be introduced as a temporary shortcut.
 
 ## Current system
 

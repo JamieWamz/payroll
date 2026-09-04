@@ -5,13 +5,11 @@ and accounting firms.
 
 > [!WARNING]
 > **Phase 1 is complete and Phase 2 domain work is in progress.** The system
-> does not yet implement authentication requests, employee workflows, payroll
+> now implements registration, login, secure session restoration, and logout,
+> but does not yet expose employee or payroll business workflows or implement
 > Zambia statutory calculations, PAYE, NAPSA, NHIMA, payslips, or statutory
-> reports. The new
-> company, identity, workforce, compensation, payroll-period, and statutory
-> evidence foundations are internal only and have no business HTTP routes. No
-> statutory rate should be inferred or used for real payroll. The current
-> application is not production-ready.
+> reports. No statutory rate should be inferred or used for real payroll. The
+> current application is not production-ready.
 
 ## What exists today
 
@@ -30,9 +28,12 @@ and accounting firms.
   deletes.
 - A database adapter that scopes tenant work to one transaction and clears its
   company context automatically on commit or rollback.
-- Argon2id password-verifier, opaque session/CSRF token, authorization
-  principal, and bounded audit-event contracts. Registration and login routes
-  are intentionally not open yet.
+- Registration and login with Argon2id password verification, a blocklist
+  contract, generic credential failures, throttling, bounded lockout, and
+  atomic first-company owner provisioning.
+- Server-side opaque sessions with idle and absolute expiration, HttpOnly
+  SameSite cookies, independently generated CSRF tokens, session restoration,
+  CSRF-checked logout, and authentication audit events.
 - Forced-RLS credential, server-side session, and append-only audit tables.
   The runtime role has no direct access to those tables; only a tenant-checked
   audit append function is currently exposed.
@@ -78,6 +79,8 @@ Statutory evidence decisions and current source gaps are recorded in
 [statutory source register](docs/statutory-source-register.md).
 Payroll-run orchestration and finalization decisions are recorded in
 [ADR 0006](docs/decisions/0006-payroll-run-lifecycle.md).
+Authentication runtime decisions are recorded in
+[ADR 0007](docs/decisions/0007-authentication-runtime.md).
 The externally researched interaction direction is recorded in the
 [product design guidelines](docs/product-design-guidelines.md).
 
@@ -186,11 +189,14 @@ docker compose --env-file .env -f compose.yaml -f compose.dev.yaml up --detach p
 | API                  | `http://127.0.0.1:3000`        | Direct Fastify access                                   |
 | API liveness         | `/api/health/live`             | Confirms the API process can respond                    |
 | API readiness        | `/api/health/ready`            | Confirms the runtime DB role and `app` schema are ready |
+| Register owner       | `POST /api/auth/register`      | Creates the first company owner and a secure session    |
+| Log in               | `POST /api/auth/login`         | Verifies credentials and creates a secure session       |
+| Restore session      | `GET /api/auth/session`        | Returns the active user and company memberships         |
+| Log out              | `POST /api/auth/logout`        | CSRF-checks and revokes the current session             |
 | Web-container health | `http://127.0.0.1:8080/health` | Confirms Nginx can serve requests                       |
 
-The API still exposes health routes only. Company, identity, and workforce
-records are not reachable through HTTP until the authentication,
-authorization, tenant resolution, CSRF, throttling, and audit boundaries are
+Company and workforce records are not yet reachable through HTTP. Those routes
+remain closed until company-scoped authorization and audit middleware are
 implemented. A readiness failure returns HTTP `503` without returning the
 underlying database error to the client.
 

@@ -37,9 +37,31 @@ const environmentSchema = z
       .enum(['development', 'test', 'production'])
       .default('development'),
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+    SESSION_ABSOLUTE_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(900)
+      .max(604_800)
+      .default(28_800),
+    SESSION_COOKIE_SECURE: z.stringbool().default(false),
+    SESSION_IDLE_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(86_400)
+      .default(1_800),
     TRUST_PROXY: z.stringbool().default(false),
     WEB_ORIGIN: z.url().default('http://127.0.0.1:5173'),
   })
+  .refine(
+    (environment) =>
+      environment.SESSION_ABSOLUTE_TTL_SECONDS >=
+      environment.SESSION_IDLE_TTL_SECONDS,
+    {
+      message: 'must be at least the session idle TTL',
+      path: ['SESSION_ABSOLUTE_TTL_SECONDS'],
+    },
+  )
   .readonly();
 
 export type Environment = z.infer<typeof environmentSchema>;

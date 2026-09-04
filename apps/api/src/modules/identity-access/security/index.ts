@@ -22,6 +22,7 @@ export {
   type CreateAuthorizationPrincipalInput,
   type SessionId,
 } from './authorization.js';
+export { commonPasswordBlocklist } from './common-password-blocklist.js';
 export {
   hashPassword,
   needsPasswordRehash,

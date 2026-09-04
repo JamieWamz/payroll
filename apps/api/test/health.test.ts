@@ -14,6 +14,13 @@ function createDatabase(available = true): Database {
       }
     },
     async close() {},
+    async withSystemTransaction(operation) {
+      return operation({
+        async query() {
+          throw new Error('Unexpected database query in health test');
+        },
+      });
+    },
     async withTenantTransaction(_companyId, operation) {
       return operation({
         async query() {

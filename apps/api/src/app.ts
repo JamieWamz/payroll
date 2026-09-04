@@ -9,18 +9,23 @@ import Fastify, {
 
 import type { Environment } from './config/environment.js';
 import type { Database } from './infrastructure/database.js';
+import type { PasswordBlocklist } from './modules/identity-access/security/index.js';
+import { DomainError } from './shared/domain/domain-error.js';
+import { authenticationRoutes } from './routes/authentication.js';
 import { healthRoutes } from './routes/health.js';
 
 interface BuildAppOptions {
   database: Database;
   environment: Environment;
   logger?: FastifyServerOptions['logger'];
+  passwordBlocklist?: PasswordBlocklist;
 }
 
 export async function buildApp({
   database,
   environment,
   logger = false,
+  passwordBlocklist,
 }: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: 1_048_576,
@@ -38,18 +43,15 @@ export async function buildApp({
     credentials: true,
     origin: environment.WEB_ORIGIN,
   });
-  await app.register(healthRoutes, { database, prefix: '/api' });
-
-  app.addHook('onClose', async () => {
-    await database.close();
-  });
 
   app.setErrorHandler(
     async (error: FastifyError, request, reply): Promise<void> => {
       const statusCode =
-        error.statusCode !== undefined && error.statusCode < 500
-          ? error.statusCode
-          : 500;
+        error instanceof DomainError
+          ? 400
+          : error.statusCode !== undefined && error.statusCode < 500
+            ? error.statusCode
+            : 500;
 
       request.log.error({ error, requestId: request.id }, 'Request failed');
 
@@ -61,6 +63,18 @@ export async function buildApp({
       });
     },
   );
+
+  await app.register(healthRoutes, { database, prefix: '/api' });
+  await app.register(authenticationRoutes, {
+    database,
+    environment,
+    ...(passwordBlocklist === undefined ? {} : { passwordBlocklist }),
+    prefix: '/api',
+  });
+
+  app.addHook('onClose', async () => {
+    await database.close();
+  });
 
   return app;
 }

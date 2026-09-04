@@ -174,6 +174,29 @@ describe('PostgreSQL database adapter', () => {
     expect(release).toHaveBeenCalledOnce();
   });
 
+  it('runs authentication work without inventing a tenant context', async () => {
+    const query = vi.fn().mockResolvedValue({ rowCount: 1, rows: [] });
+    const release = vi.fn();
+    poolMocks.connect.mockResolvedValue({ query, release });
+    const database = createPostgresDatabase(environment);
+
+    await database.withSystemTransaction(async (transaction) => {
+      await transaction.query('SELECT app.find_authentication_record($1)', [
+        'owner@example.com',
+      ]);
+    });
+
+    expect(query.mock.calls).toEqual([
+      ['BEGIN'],
+      ['SELECT app.find_authentication_record($1)', ['owner@example.com']],
+      ['COMMIT'],
+    ]);
+    expect(query.mock.calls.flat().join(' ')).not.toContain(
+      'app.current_company_id',
+    );
+    expect(release).toHaveBeenCalledOnce();
+  });
+
   it('rolls back callback failures and always releases the client', async () => {
     const query = vi.fn().mockResolvedValue({ rowCount: null, rows: [] });
     const release = vi.fn();

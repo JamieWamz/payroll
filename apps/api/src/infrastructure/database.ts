@@ -14,6 +14,9 @@ export interface TenantTransaction {
 export interface Database {
   checkHealth(): Promise<void>;
   close(): Promise<void>;
+  withSystemTransaction<Result>(
+    operation: (transaction: TenantTransaction) => Promise<Result>,
+  ): Promise<Result>;
   withTenantTransaction<Result>(
     companyId: EntityId<'Company'>,
     operation: (transaction: TenantTransaction) => Promise<Result>,
@@ -78,6 +81,61 @@ export function createPostgresDatabase(
 
   let closePromise: Promise<void> | undefined;
 
+  async function withTransaction<Result>(
+    operation: (transaction: TenantTransaction) => Promise<Result>,
+    companyId?: EntityId<'Company'>,
+  ): Promise<Result> {
+    const client = await pool.connect();
+    let active = true;
+    let transactionStarted = false;
+
+    const transaction: TenantTransaction = {
+      async query<Row extends QueryResultRow = QueryResultRow>(
+        text: string,
+        values?: readonly unknown[],
+      ): Promise<QueryResult<Row>> {
+        if (!active) {
+          throw new Error(
+            companyId === undefined
+              ? 'System transaction is no longer active'
+              : 'Tenant transaction is no longer active',
+          );
+        }
+
+        return client.query<Row>(
+          text,
+          values === undefined ? undefined : [...values],
+        );
+      },
+    };
+
+    try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+      if (companyId !== undefined) {
+        await client.query(setTenantContextQuery, [companyId]);
+      }
+
+      const result = await operation(transaction);
+      active = false;
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      active = false;
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch {
+          // Preserve the operation or commit error as the actionable failure.
+        }
+      }
+      throw error;
+    } finally {
+      active = false;
+      client.release();
+    }
+  }
+
   return {
     async checkHealth(): Promise<void> {
       const client = await pool.connect();
@@ -96,56 +154,16 @@ export function createPostgresDatabase(
       closePromise ??= pool.end();
       await closePromise;
     },
+    async withSystemTransaction<Result>(
+      operation: (transaction: TenantTransaction) => Promise<Result>,
+    ): Promise<Result> {
+      return withTransaction(operation);
+    },
     async withTenantTransaction<Result>(
       companyId: EntityId<'Company'>,
       operation: (transaction: TenantTransaction) => Promise<Result>,
     ): Promise<Result> {
-      const client = await pool.connect();
-      let active = true;
-      let transactionStarted = false;
-
-      const transaction: TenantTransaction = {
-        async query<Row extends QueryResultRow = QueryResultRow>(
-          text: string,
-          values?: readonly unknown[],
-        ): Promise<QueryResult<Row>> {
-          if (!active) {
-            throw new Error('Tenant transaction is no longer active');
-          }
-
-          return client.query<Row>(
-            text,
-            values === undefined ? undefined : [...values],
-          );
-        },
-      };
-
-      try {
-        await client.query('BEGIN');
-        transactionStarted = true;
-        await client.query(setTenantContextQuery, [companyId]);
-
-        const result = await operation(transaction);
-        active = false;
-        await client.query('COMMIT');
-
-        return result;
-      } catch (error) {
-        active = false;
-
-        if (transactionStarted) {
-          try {
-            await client.query('ROLLBACK');
-          } catch {
-            // Preserve the operation or commit error as the actionable failure.
-          }
-        }
-
-        throw error;
-      } finally {
-        active = false;
-        client.release();
-      }
+      return withTransaction(operation, companyId);
     },
   };
 }

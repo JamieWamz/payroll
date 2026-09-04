@@ -1,10 +1,10 @@
 # Security Policy
 
 ZamPayroll is currently in Phase 2 foundation work. It does not yet process
-payroll, statutory calculations, or authentication requests, and it has not
-been declared production-ready. Internal credential, session, authorization,
-audit, and tenant-isolated workforce primitives now exist, so security reports
-about those boundaries are important.
+real payroll or statutory calculations, and it has not been declared
+production-ready. Registration, login, cookie sessions, CSRF-checked logout,
+credential lockout, audit, and tenant-isolated data primitives now exist, so
+security reports about those boundaries are important.
 
 ## Supported versions
 
@@ -78,8 +78,9 @@ The Compose files are a local and foundation deployment baseline. Example
 passwords are unsafe, PostgreSQL passwords stored in an initialized named
 volume do not change merely because `.env` changes, and the repository does not
 provide production TLS termination, external secret management, backup and
-restore operations, monitoring/alerting, rate limiting, authentication routes,
-tenant authorization enforcement, or compliance certification.
+restore operations, monitoring/alerting, tenant authorization enforcement, or
+compliance certification. Authentication endpoints have local throttling, but
+deployment-level abuse and denial-of-service protection remain required.
 
 Anyone deploying the software is responsible for threat modeling the target
 environment, replacing all credentials, restricting ingress, configuring TLS
@@ -88,6 +89,8 @@ images, backing up and testing recovery, monitoring security events, and
 meeting applicable Zambian legal and regulatory obligations. Enabling
 `TRUST_PROXY` without a known trusted proxy boundary can make forwarded client
 metadata untrustworthy.
+Set `SESSION_COOKIE_SECURE=true` for HTTPS deployments; the false local default
+exists only so loopback HTTP development remains usable.
 
 An application's use of this repository or successful test results must not be
 represented as proof of payroll correctness, statutory compliance, or security

@@ -21,8 +21,10 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.2",
     "@fastify/cors": "11.3.0",
     "@fastify/helmet": "13.1.1",
+    "@fastify/rate-limit": "10.3.0",
     "@node-rs/argon2": "2.2.0",
     "fastify": "5.12.1",
     "pg": "8.23.0",
