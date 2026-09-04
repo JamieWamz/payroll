@@ -7,8 +7,9 @@ and accounting firms.
 > **Phase 1 is complete and Phase 2 application work is in progress.** The
 > system now implements registration, login, secure session restoration, and
 > logout, plus tenant-authorized company, workforce, and effective-dated
-> compensation workflows. It does not yet expose payroll operations or
-> implement Zambia statutory calculations, PAYE, NAPSA, NHIMA, payslips, or statutory reports. No
+> compensation workflows and payroll-period creation/history. It does not yet
+> expose payroll calculation or finalization, or implement Zambia statutory
+> calculations, PAYE, NAPSA, NHIMA, payslips, or statutory reports. No
 > statutory rate should be inferred or used for real payroll. The current
 > application is not production-ready.
 
@@ -44,6 +45,9 @@ and accounting firms.
 - Authenticated compensation history, salary creation/end-dating, and fixed
   allowance/deduction creation/end-dating workflows with CSRF protection,
   optimistic versions, conflict handling, and atomic audit events.
+- Authenticated payroll-period history and creation workflows, including
+  regular-period overlap prevention, explicit off-cycle periods, bounded
+  filtering, CSRF protection, permissions, and atomic audit events.
 - Forced-RLS credential, server-side session, and append-only audit tables.
   The runtime role has no direct access to those tables; only a tenant-checked
   audit append function is currently exposed.
@@ -95,6 +99,8 @@ Tenant-authorized company and workforce HTTP decisions are recorded in
 [ADR 0008](docs/decisions/0008-tenant-authorized-company-workforce-http.md).
 Tenant-authorized compensation HTTP decisions are recorded in
 [ADR 0009](docs/decisions/0009-tenant-authorized-compensation-http.md).
+Tenant-authorized payroll-period HTTP decisions are recorded in
+[ADR 0010](docs/decisions/0010-tenant-authorized-payroll-period-http.md).
 The externally researched interaction direction is recorded in the
 [product design guidelines](docs/product-design-guidelines.md).
 
@@ -217,9 +223,10 @@ docker compose --env-file .env -f compose.yaml -f compose.dev.yaml up --detach p
 | End salary           | `PATCH /api/companies/:companyId/employments/:employmentId/salaries/:salaryId/end`      | Ends an open salary                                     |
 | Add component        | `POST /api/companies/:companyId/employments/:employmentId/components`                   | Adds a fixed allowance or deduction                     |
 | End component        | `PATCH /api/companies/:companyId/employments/:employmentId/components/:componentId/end` | Ends an open allowance or deduction                     |
+| Payroll periods      | `GET, POST /api/companies/:companyId/payroll-periods`                                   | Lists or creates regular and off-cycle periods          |
 | Web-container health | `http://127.0.0.1:8080/health`                                                          | Confirms Nginx can serve requests                       |
 
-State-changing company, workforce, and compensation requests require the CSRF token returned
+State-changing company, workforce, compensation, and payroll-period requests require the CSRF token returned
 by authentication in both the `zampayroll_csrf` cookie and `X-CSRF-Token`
 header. A readiness failure returns HTTP `503` without returning the underlying
 database error to the client.

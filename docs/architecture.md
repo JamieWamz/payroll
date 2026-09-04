@@ -10,10 +10,10 @@ implemented.
 
 > [!IMPORTANT]
 > There is no statutory calculation. PAYE, NAPSA, NHIMA,
-> payslips, and payroll business routes are not implemented. Cookie-session
-> authentication and authorized company, workforce, and compensation routes are
-> implemented. Company, identity, workforce,
-> payroll-period, and statutory-evidence records otherwise remain internal
+> payslips, and payroll calculation/finalization routes are not implemented.
+> Cookie-session authentication and authorized company, workforce,
+> compensation, and payroll-period routes are implemented. Company, identity,
+> workforce, and statutory-evidence records otherwise remain internal
 > foundations. Payroll-run lifecycle and snapshot persistence exist, but no
 > statutory calculator or approved rates exist.
 
@@ -35,6 +35,8 @@ Tenant-authorized company and workforce HTTP decisions are recorded in
 [ADR 0008](decisions/0008-tenant-authorized-company-workforce-http.md).
 Tenant-authorized compensation HTTP decisions are recorded in
 [ADR 0009](decisions/0009-tenant-authorized-compensation-http.md).
+Tenant-authorized payroll-period HTTP decisions are recorded in
+[ADR 0010](decisions/0010-tenant-authorized-payroll-period-http.md).
 
 ## Current Phase 2 boundary
 
@@ -69,7 +71,8 @@ append their success audit event atomically. Company read/name-update; employee
 list/create/detail/update/archive; and employment-create/end routes now use
 this boundary. Compensation history, salary create/end, and allowance or
 deduction create/end routes use the same boundary. Client identity or
-permission headers are never accepted.
+permission headers are never accepted. Payroll-period list/create routes apply
+the same controls with `payroll.read` and `payroll.calculate` respectively.
 
 The workforce foundation stores only company-scoped employee numbers, names,
 lifecycle state, position titles, and inclusive employment dates. Pure domain
@@ -88,7 +91,8 @@ taxability behavior. Authorized HTTP workflows expose history and explicit
 creation/end-dating with optimistic concurrency and append-only audit events.
 Explicit regular and off-cycle payroll periods carry a
 separate payment date; regular periods cannot overlap within one company.
-These tables also force tenant RLS and deny runtime hard deletes.
+Authorized APIs expose bounded period history and creation. These tables also
+force tenant RLS and deny runtime hard deletes.
 
 The statutory-configuration foundation stores effective-dated draft,
 verified, and retired evidence versions. Verification requires source records
@@ -109,7 +113,7 @@ database and domain lifecycle guards make finalized runs, snapshots, and
 components immutable. This is orchestration only: there is still no PAYE,
 NAPSA, or NHIMA arithmetic implementation.
 
-Payroll, statutory-configuration, report, and payslip HTTP routes
+Payroll calculation/finalization, statutory-configuration, report, and payslip HTTP routes
 remain closed until current company membership, RBAC, tenant context, CSRF
 enforcement, and append-only audit are integrated and tested for each command.
 Client-provided user or company headers are not an authentication mechanism and
@@ -252,16 +256,16 @@ code must not depend on HTTP, React, Fastify, PostgreSQL, or Docker.
 
 Current and candidate module boundaries are:
 
-| Module                  | Future ownership                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                                                                        |
-| Company                 | Company profile, payroll settings, and statutory identifiers                                                                                           |
-| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed)                                                   |
-| Compensation            | Effective-dated salaries, allowances, and deductions with authorized history and lifecycle workflows                                                   |
-| Payroll                 | Periods, run snapshots, calculation orchestration, and finalization foundations implemented; arithmetic, corrections, and reversals remain future work |
-| Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                                                                  |
-| Documents and reporting | Payslips, statutory schedules, and configurable bank exports                                                                                           |
-| Audit                   | Append-oriented records of security-sensitive and payroll-sensitive actions                                                                            |
+| Module                  | Future ownership                                                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Identity and access     | Users, secure sessions, roles, and company-scoped authorization                                                                                                          |
+| Company                 | Company profile, payroll settings, and statutory identifiers                                                                                                             |
+| Workforce               | Employees and effective-dated employment lifecycle (foundation implemented; workflows remain closed)                                                                     |
+| Compensation            | Effective-dated salaries, allowances, and deductions with authorized history and lifecycle workflows                                                                     |
+| Payroll                 | Authorized period creation/history plus run snapshot, calculation orchestration, and finalization foundations; arithmetic, corrections, and reversals remain future work |
+| Statutory configuration | Effective-dated PAYE, NAPSA, and NHIMA rule sets with source metadata                                                                                                    |
+| Documents and reporting | Payslips, statutory schedules, and configurable bank exports                                                                                                             |
+| Audit                   | Append-oriented records of security-sensitive and payroll-sensitive actions                                                                                              |
 
 Cross-module database access should not bypass module invariants. APIs must
 validate untrusted inputs, application services must authorize company-scoped
