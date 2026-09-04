@@ -245,6 +245,7 @@ environment files are ignored by Git.
 | Group                 | Variables                                                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | API runtime           | `NODE_ENV`, `LOG_LEVEL`, `WEB_ORIGIN`, `TRUST_PROXY`, `HOST`, `PORT`                                                               |
+| Local web proxy       | `API_PROXY_TARGET` (defaults to `http://127.0.0.1:3000`)                                                                           |
 | Host port mappings    | `API_PORT`, `WEB_PORT`, `POSTGRES_PORT`                                                                                            |
 | PostgreSQL bootstrap  | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`                                                                                |
 | Least-privilege roles | `MIGRATION_DB_PASSWORD`, `APP_DB_PASSWORD`                                                                                         |
