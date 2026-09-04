@@ -164,6 +164,8 @@ describe.runIf(
       status: 'active',
     });
     const employeeId = employee.json<{ id: string }>().id;
+    const employmentId = employee.json<{ employment: { id: string } }>()
+      .employment.id;
 
     const list = await requireApp().inject({
       headers: { cookie: primary.cookie },
@@ -183,8 +185,11 @@ describe.runIf(
     });
     expect(detail.statusCode).toBe(200);
     expect(detail.json()).toMatchObject({
-      employments: [{ positionTitle: 'Payroll Officer' }],
+      employments: [
+        { id: employmentId, positionTitle: 'Payroll Officer', version: 1 },
+      ],
       id: employeeId,
+      version: 1,
     });
 
     const overlappingEmployment = await requireApp().inject({
@@ -202,6 +207,67 @@ describe.runIf(
       message: 'Employment periods for one employee cannot overlap',
     });
 
+    const prematureArchive = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'PATCH',
+      payload: { expectedVersion: 1, status: 'archived' },
+      url: `/api/companies/${primary.companyId}/employees/${employeeId}`,
+    });
+    expect(prematureArchive.statusCode).toBe(400);
+    expect(prematureArchive.json()).toMatchObject({
+      message: 'An employee with an open employment period cannot be archived',
+    });
+
+    const endedEmployment = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'PATCH',
+      payload: { endsOn: '2026-12-31', expectedVersion: 1 },
+      url: `/api/companies/${primary.companyId}/employees/${employeeId}/employments/${employmentId}`,
+    });
+    expect(endedEmployment.statusCode).toBe(200);
+    expect(endedEmployment.json()).toMatchObject({
+      endsOn: '2026-12-31',
+      id: employmentId,
+      version: 2,
+    });
+
+    const archivedEmployee = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'PATCH',
+      payload: {
+        expectedVersion: 1,
+        givenName: 'Mutinta Grace',
+        status: 'archived',
+      },
+      url: `/api/companies/${primary.companyId}/employees/${employeeId}`,
+    });
+    expect(archivedEmployee.statusCode).toBe(200);
+    expect(archivedEmployee.json()).toMatchObject({
+      givenName: 'Mutinta Grace',
+      status: 'archived',
+      version: 2,
+    });
+
+    const implicitReactivation = await requireApp().inject({
+      headers: {
+        cookie: primary.cookie,
+        'x-csrf-token': primary.csrfToken,
+      },
+      method: 'PATCH',
+      payload: { expectedVersion: 2, status: 'active' },
+      url: `/api/companies/${primary.companyId}/employees/${employeeId}`,
+    });
+    expect(implicitReactivation.statusCode).toBe(409);
+
     const audit = await requireMigrationPool().query<{
       eventType: string;
       targetId: string;
@@ -212,7 +278,9 @@ describe.runIf(
         WHERE company_id = $1
           AND event_type IN (
             'company.profile-updated',
-            'workforce.employee-created'
+            'workforce.employee-created',
+            'workforce.employee-updated',
+            'workforce.employment-ended'
           )
         ORDER BY event_type
       `,
@@ -221,6 +289,8 @@ describe.runIf(
     expect(audit.rows).toEqual([
       { eventType: 'company.profile-updated', targetId: primary.companyId },
       { eventType: 'workforce.employee-created', targetId: employeeId },
+      { eventType: 'workforce.employee-updated', targetId: employeeId },
+      { eventType: 'workforce.employment-ended', targetId: employmentId },
     ]);
 
     await requireMigrationPool().query(

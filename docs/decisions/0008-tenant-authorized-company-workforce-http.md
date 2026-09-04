@@ -24,9 +24,10 @@ protection and an audit record.
   required permission in the requested company.
 - Require the independently stored CSRF cookie, `X-CSRF-Token` header, and
   server-side token digest to match before every company or workforce write.
-- Expose company read/name-update and employee list/create/detail plus
-  employment-create routes. Use bounded list sizes, domain normalization,
-  employment-history validation, and database constraints at the boundary.
+- Expose company read/name-update; employee list/create/detail/update/archive;
+  and employment-create/end routes. Use bounded list sizes, domain
+  normalization, employment-history validation, and database constraints at
+  the boundary.
 - Use optimistic company versions to reject lost updates. Translate expected
   uniqueness and concurrency conflicts to `409` without exposing PostgreSQL
   details.
@@ -43,9 +44,9 @@ protection and an audit record.
   tenant-isolated HTTP APIs and have PostgreSQL-backed integration coverage.
 - A valid session does not imply access to every company, and changing a role
   or permission takes effect on the next request.
-- Employee editing, ending employment, archival/reactivation policy, company
-  payroll settings, statutory identifiers, invitations, and role-management
-  routes remain later incremental work.
+- Explicit employee reactivation policy, company payroll settings, statutory
+  identifiers, invitations, and role-management routes remain later incremental
+  work. Archived employees cannot be reactivated implicitly.
 - Compensation, payroll, statutory configuration, reports, and payslips remain
   closed until each command receives the same authorization, CSRF, validation,
   concurrency, and audit treatment.

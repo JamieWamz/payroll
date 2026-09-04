@@ -38,8 +38,9 @@ and accounting firms.
 - Transaction-atomic tenant authorization that resolves each requested company
   to a live membership and current role permissions, with CSRF checks and audit
   writes for company and workforce mutations.
-- Authenticated company read/name-update plus employee list/create/detail and
-  employment-create HTTP workflows with bounded queries and conflict handling.
+- Authenticated company read/name-update; employee list/create/detail/update/
+  archive; and employment-create/end HTTP workflows with bounded queries,
+  optimistic versions, conflict handling, and audit events.
 - Forced-RLS credential, server-side session, and append-only audit tables.
   The runtime role has no direct access to those tables; only a tenant-checked
   audit append function is currently exposed.
@@ -190,22 +191,23 @@ docker compose --env-file .env -f compose.yaml -f compose.dev.yaml up --detach p
 
 ## Endpoints
 
-| Runtime              | Address                                                            | Purpose                                                 |
-| -------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- |
-| Host development web | `http://127.0.0.1:5173`                                            | Vite development server                                 |
-| Compose web          | `http://127.0.0.1:8080`                                            | Nginx static frontend and `/api` proxy                  |
-| API                  | `http://127.0.0.1:3000`                                            | Direct Fastify access                                   |
-| API liveness         | `/api/health/live`                                                 | Confirms the API process can respond                    |
-| API readiness        | `/api/health/ready`                                                | Confirms the runtime DB role and `app` schema are ready |
-| Register owner       | `POST /api/auth/register`                                          | Creates the first company owner and a secure session    |
-| Log in               | `POST /api/auth/login`                                             | Verifies credentials and creates a secure session       |
-| Restore session      | `GET /api/auth/session`                                            | Returns the active user and company memberships         |
-| Log out              | `POST /api/auth/logout`                                            | CSRF-checks and revokes the current session             |
-| Company profile      | `GET, PATCH /api/companies/:companyId`                             | Reads or renames an authorized company                  |
-| Employees            | `GET, POST /api/companies/:companyId/employees`                    | Lists or creates employees                              |
-| Employee detail      | `GET /api/companies/:companyId/employees/:employeeId`              | Returns employment history                              |
-| Add employment       | `POST /api/companies/:companyId/employees/:employeeId/employments` | Adds validated history                                  |
-| Web-container health | `http://127.0.0.1:8080/health`                                     | Confirms Nginx can serve requests                       |
+| Runtime              | Address                                                                           | Purpose                                                 |
+| -------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Host development web | `http://127.0.0.1:5173`                                                           | Vite development server                                 |
+| Compose web          | `http://127.0.0.1:8080`                                                           | Nginx static frontend and `/api` proxy                  |
+| API                  | `http://127.0.0.1:3000`                                                           | Direct Fastify access                                   |
+| API liveness         | `/api/health/live`                                                                | Confirms the API process can respond                    |
+| API readiness        | `/api/health/ready`                                                               | Confirms the runtime DB role and `app` schema are ready |
+| Register owner       | `POST /api/auth/register`                                                         | Creates the first company owner and a secure session    |
+| Log in               | `POST /api/auth/login`                                                            | Verifies credentials and creates a secure session       |
+| Restore session      | `GET /api/auth/session`                                                           | Returns the active user and company memberships         |
+| Log out              | `POST /api/auth/logout`                                                           | CSRF-checks and revokes the current session             |
+| Company profile      | `GET, PATCH /api/companies/:companyId`                                            | Reads or renames an authorized company                  |
+| Employees            | `GET, POST /api/companies/:companyId/employees`                                   | Lists or creates employees                              |
+| Employee detail      | `GET, PATCH /api/companies/:companyId/employees/:employeeId`                      | Reads, edits, or archives an employee                   |
+| Add employment       | `POST /api/companies/:companyId/employees/:employeeId/employments`                | Adds validated history                                  |
+| End employment       | `PATCH /api/companies/:companyId/employees/:employeeId/employments/:employmentId` | Ends active employment                                  |
+| Web-container health | `http://127.0.0.1:8080/health`                                                    | Confirms Nginx can serve requests                       |
 
 State-changing company and workforce requests require the CSRF token returned
 by authentication in both the `zampayroll_csrf` cookie and `X-CSRF-Token`

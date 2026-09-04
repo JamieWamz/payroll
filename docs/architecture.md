@@ -63,9 +63,9 @@ The tenant authorization runtime opens row-level-security scope from a parsed
 company URL identifier, then resolves the opaque session, active company
 membership, active roles, and current permissions inside that same transaction.
 State-changing routes additionally validate the CSRF cookie/header/digest and
-append their success audit event atomically. Company read/name-update and
-employee list/create/detail plus employment-create routes now use this boundary;
-client identity or permission headers are never accepted.
+append their success audit event atomically. Company read/name-update; employee
+list/create/detail/update/archive; and employment-create/end routes now use
+this boundary. Client identity or permission headers are never accepted.
 
 The workforce foundation stores only company-scoped employee numbers, names,
 lifecycle state, position titles, and inclusive employment dates. Pure domain

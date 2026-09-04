@@ -10,12 +10,15 @@ import type {
 import { normalizeCompanyName } from '../modules/companies/domain/index.js';
 import type { AuthorizationPrincipal } from '../modules/identity-access/security/index.js';
 import {
+  archiveEmployee,
   assertEmploymentHistory,
   createEmployee,
   createEmployment,
+  endEmployment,
   type Employee,
   type Employment,
 } from '../modules/workforce/domain/index.js';
+import { parseEntityId } from '../shared/domain/entity-id.js';
 import { ApiError } from './api-error.js';
 import { withAuthorizedCompanyTransaction } from './tenant-authorization.js';
 
@@ -63,6 +66,13 @@ const companyParamsSchema = z
 const employeeParamsSchema = z
   .object({ companyId: z.string().max(36), employeeId: z.string().max(36) })
   .strict();
+const employmentParamsSchema = z
+  .object({
+    companyId: z.string().max(36),
+    employeeId: z.string().max(36),
+    employmentId: z.string().max(36),
+  })
+  .strict();
 const companyUpdateSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
@@ -89,6 +99,30 @@ const employeeCreateSchema = z
     familyName: z.string().max(160),
     givenName: z.string().max(160),
     middleName: z.string().max(160).optional(),
+  })
+  .strict();
+const employeeUpdateSchema = z
+  .object({
+    employeeNumber: z.string().max(128).optional(),
+    expectedVersion: z.number().int().positive(),
+    familyName: z.string().max(160).optional(),
+    givenName: z.string().max(160).optional(),
+    middleName: z.string().max(160).nullable().optional(),
+    status: z.enum(['active', 'archived']).optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.employeeNumber !== undefined ||
+      value.familyName !== undefined ||
+      value.givenName !== undefined ||
+      value.middleName !== undefined ||
+      value.status !== undefined,
+  );
+const employmentEndSchema = z
+  .object({
+    endsOn: z.string().max(10),
+    expectedVersion: z.number().int().positive(),
   })
   .strict();
 
@@ -273,6 +307,7 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
     '/companies/:companyId/employees/:employeeId',
     async (request, reply) => {
       const params = parseInput(employeeParamsSchema, request.params);
+      const employeeId = parseEntityId(params.employeeId, 'Employee');
       const result = await withAuthorizedCompanyTransaction(
         options.database,
         {
@@ -282,7 +317,7 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
           request,
         },
         async (transaction) => {
-          const employee = await findEmployee(transaction, params.employeeId);
+          const employee = await findEmployee(transaction, employeeId);
           if (employee === undefined) {
             return undefined;
           }
@@ -300,10 +335,123 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
     },
   );
 
+  app.patch(
+    '/companies/:companyId/employees/:employeeId',
+    async (request, reply) => {
+      const params = parseInput(employeeParamsSchema, request.params);
+      const employeeId = parseEntityId(params.employeeId, 'Employee');
+      const body = parseInput(employeeUpdateSchema, request.body);
+
+      try {
+        const updated = await withAuthorizedCompanyTransaction(
+          options.database,
+          {
+            companyId: params.companyId,
+            environment: options.environment,
+            permission: 'workforce.write',
+            request,
+            requireCsrf: true,
+          },
+          async (transaction, principal) => {
+            const record = await findEmployee(transaction, employeeId);
+            if (record === undefined) {
+              throw new ApiError(404, 'Employee was not found');
+            }
+            if (record.status === 'archived' && body.status === 'active') {
+              throw new ApiError(
+                409,
+                'Archived employees cannot be reactivated implicitly',
+              );
+            }
+
+            let employee = createEmployee({
+              companyId: record.companyId,
+              employeeNumber: body.employeeNumber ?? record.employeeNumber,
+              familyName: body.familyName ?? record.familyName,
+              givenName: body.givenName ?? record.givenName,
+              id: record.id,
+              ...(body.middleName === undefined
+                ? record.middleName === null
+                  ? {}
+                  : { middleName: record.middleName }
+                : body.middleName === null
+                  ? {}
+                  : { middleName: body.middleName }),
+              status: record.status,
+            });
+            if (record.status === 'active' && body.status === 'archived') {
+              const history = (
+                await findEmployments(transaction, employee.id)
+              ).map((employment) => toEmploymentDomain(employment, employee));
+              employee = archiveEmployee(employee, history);
+            }
+
+            const result = await transaction.query<EmployeeRecord>(
+              `
+                UPDATE app.employees
+                SET employee_number = $1,
+                    given_name = $2,
+                    middle_name = $3,
+                    family_name = $4,
+                    status = $5,
+                    version = version + 1,
+                    updated_at = statement_timestamp()
+                WHERE company_id = app.current_company_id()
+                  AND id = $6
+                  AND version = $7
+                RETURNING
+                  id,
+                  company_id AS "companyId",
+                  employee_number AS "employeeNumber",
+                  given_name AS "givenName",
+                  middle_name AS "middleName",
+                  family_name AS "familyName",
+                  status,
+                  version::text AS version,
+                  updated_at AS "updatedAt"
+              `,
+              [
+                employee.employeeNumber,
+                employee.name.givenName,
+                employee.name.middleName ?? null,
+                employee.name.familyName,
+                employee.status,
+                employee.id,
+                body.expectedVersion,
+              ],
+            );
+            const updatedRecord = result.rows[0];
+            if (updatedRecord === undefined) {
+              throw new ApiError(
+                409,
+                'Employee was changed by another request',
+              );
+            }
+            await appendAuditEvent(transaction, principal, request.id, {
+              eventType: 'workforce.employee-updated',
+              targetId: updatedRecord.id,
+              targetType: 'employee',
+            });
+            return updatedRecord;
+          },
+        );
+        await reply
+          .header('cache-control', 'no-store')
+          .send(serializeEmployee(updated));
+      } catch (error) {
+        if (isPostgresError(error, '23505')) {
+          throw new ApiError(409, 'Employee number already exists');
+        }
+        throw error;
+      }
+    },
+  );
+
   app.post(
     '/companies/:companyId/employees/:employeeId/employments',
     async (request, reply) => {
       const params = parseInput(employeeParamsSchema, request.params);
+      const employeeId = parseEntityId(params.employeeId, 'Employee');
       const body = parseInput(employmentSchema, request.body);
 
       try {
@@ -317,10 +465,7 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
             requireCsrf: true,
           },
           async (transaction, principal) => {
-            const employeeRecord = await findEmployee(
-              transaction,
-              params.employeeId,
-            );
+            const employeeRecord = await findEmployee(transaction, employeeId);
             if (employeeRecord === undefined) {
               throw new ApiError(404, 'Employee was not found');
             }
@@ -351,6 +496,99 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
       } catch (error) {
         if (isPostgresError(error, '23505')) {
           throw new ApiError(409, 'Employment conflicts with existing history');
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.patch(
+    '/companies/:companyId/employees/:employeeId/employments/:employmentId',
+    async (request, reply) => {
+      const params = parseInput(employmentParamsSchema, request.params);
+      const employeeId = parseEntityId(params.employeeId, 'Employee');
+      const employmentId = parseEntityId(params.employmentId, 'Employment');
+      const body = parseInput(employmentEndSchema, request.body);
+
+      try {
+        const updated = await withAuthorizedCompanyTransaction(
+          options.database,
+          {
+            companyId: params.companyId,
+            environment: options.environment,
+            permission: 'workforce.write',
+            request,
+            requireCsrf: true,
+          },
+          async (transaction, principal) => {
+            const employeeRecord = await findEmployee(transaction, employeeId);
+            if (employeeRecord === undefined) {
+              throw new ApiError(404, 'Employee was not found');
+            }
+            const record = await findEmployment(
+              transaction,
+              employeeId,
+              employmentId,
+            );
+            if (record === undefined) {
+              throw new ApiError(404, 'Employment was not found');
+            }
+            const employee = toEmployeeDomain(employeeRecord);
+            const employment = endEmployment(
+              toEmploymentDomain(record, employee),
+              body.endsOn,
+            );
+            const result = await transaction.query<EmploymentRecord>(
+              `
+                UPDATE app.employments
+                SET ends_on = $1,
+                    version = version + 1,
+                    updated_at = statement_timestamp()
+                WHERE company_id = app.current_company_id()
+                  AND employee_id = $2
+                  AND id = $3
+                  AND version = $4
+                RETURNING
+                  id,
+                  company_id AS "companyId",
+                  employee_id AS "employeeId",
+                  position_title AS "positionTitle",
+                  starts_on::text AS "startsOn",
+                  ends_on::text AS "endsOn",
+                  version::text AS version,
+                  updated_at AS "updatedAt"
+              `,
+              [
+                employment.effectivePeriod.endsOn,
+                employeeId,
+                employmentId,
+                body.expectedVersion,
+              ],
+            );
+            const updatedRecord = result.rows[0];
+            if (updatedRecord === undefined) {
+              throw new ApiError(
+                409,
+                'Employment was changed by another request',
+              );
+            }
+            await appendAuditEvent(transaction, principal, request.id, {
+              eventType: 'workforce.employment-ended',
+              targetId: updatedRecord.id,
+              targetType: 'employment',
+            });
+            return updatedRecord;
+          },
+        );
+        await reply
+          .header('cache-control', 'no-store')
+          .send(serializeEmployment(updated));
+      } catch (error) {
+        if (isPostgresError(error, '23514')) {
+          throw new ApiError(
+            409,
+            'Employment end conflicts with compensation history',
+          );
         }
         throw error;
       }
@@ -434,6 +672,15 @@ async function findEmployments(
     [employeeId],
   );
   return result.rows;
+}
+
+async function findEmployment(
+  transaction: TenantTransaction,
+  employeeId: string,
+  employmentId: string,
+): Promise<EmploymentRecord | undefined> {
+  const records = await findEmployments(transaction, employeeId);
+  return records.find((record) => record.id === employmentId);
 }
 
 async function insertEmployee(
