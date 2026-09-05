@@ -14,7 +14,7 @@ import {
 
 export type StatutoryConfigurationId = EntityId<'StatutoryConfiguration'>;
 export type MembershipId = EntityId<'CompanyMembership'>;
-export type StatutoryAuthority = 'nhima' | 'napsa' | 'zra';
+export type StatutoryAuthority = 'labour' | 'nhima' | 'napsa' | 'zra';
 export type StatutoryConfigurationStatus = 'draft' | 'retired' | 'verified';
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue =
@@ -62,11 +62,15 @@ export interface CreateStatutorySourceInput {
   readonly uri: string;
 }
 
-const authorities: readonly StatutoryAuthority[] = Object.freeze([
+const supportedAuthorities: readonly StatutoryAuthority[] = Object.freeze([
+  'labour',
   'nhima',
   'napsa',
   'zra',
 ]);
+const requiredPayrollAuthorities: readonly StatutoryAuthority[] = Object.freeze(
+  ['nhima', 'napsa', 'zra'],
+);
 const versionPattern = /^[A-Z0-9]+(?:[._-][A-Z0-9]+)*$/;
 const versionMaximumLength = 64;
 const titleMaximumLength = 240;
@@ -239,7 +243,9 @@ function assertCompleteEvidence(
   if (
     parameterKeys.length === 0 ||
     !['nhima', 'napsa', 'paye'].every((key) => parameterKeys.includes(key)) ||
-    !authorities.every((authority) => sourceAuthorities.has(authority))
+    !requiredPayrollAuthorities.every((authority) =>
+      sourceAuthorities.has(authority),
+    )
   ) {
     throw invalidConfiguration('incomplete_verification_evidence');
   }
@@ -308,7 +314,7 @@ function isJsonRecord(
 }
 
 function parseAuthority(value: string): StatutoryAuthority {
-  if (!authorities.includes(value as StatutoryAuthority)) {
+  if (!supportedAuthorities.includes(value as StatutoryAuthority)) {
     throw invalidConfiguration('invalid_authority');
   }
   return value as StatutoryAuthority;

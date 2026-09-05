@@ -9,6 +9,7 @@ import type {
 } from '../infrastructure/database.js';
 import {
   zambianPublishedContributionReference,
+  zambianPublishedTerminalBenefitReference,
   zraPublishedMonthlyPayeReference,
 } from '../modules/payroll/calculation/index.js';
 import {
@@ -68,7 +69,7 @@ const listSchema = z
 const sourceSchema = z
   .object({
     accessedOn: z.string().max(10),
-    authority: z.enum(['zra', 'napsa', 'nhima']),
+    authority: z.enum(['zra', 'napsa', 'nhima', 'labour']),
     publishedOn: z.string().max(10).optional(),
     title: z.string().max(480),
     uri: z.string().max(4096),
@@ -112,6 +113,17 @@ export const statutoryConfigurationRoutes: FastifyPluginAsync<
       await reply
         .header('cache-control', 'no-store')
         .send(zambianPublishedContributionReference);
+    },
+  );
+
+  app.get(
+    '/companies/:companyId/statutory-configurations/references/terminal-benefits',
+    async (request, reply) => {
+      const params = parseInput(companyParamsSchema, request.params);
+      await authorizeReferenceRead(request, options, params.companyId);
+      await reply
+        .header('cache-control', 'no-store')
+        .send(zambianPublishedTerminalBenefitReference);
     },
   );
 

@@ -15,8 +15,10 @@ import { DomainError } from './shared/domain/domain-error.js';
 import { authenticationRoutes } from './routes/authentication.js';
 import { companyWorkforceRoutes } from './routes/company-workforce.js';
 import { compensationRoutes } from './routes/compensation.js';
+import { gratuityPolicyRoutes } from './routes/gratuity-policies.js';
 import { healthRoutes } from './routes/health.js';
 import { payrollPeriodRoutes } from './routes/payroll-periods.js';
+import { operationsRoutes } from './routes/operations.js';
 import { statutoryConfigurationRoutes } from './routes/statutory-configurations.js';
 
 interface BuildAppOptions {
@@ -87,12 +89,22 @@ export async function buildApp({
     environment,
     prefix: '/api',
   });
+  await app.register(gratuityPolicyRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
   await app.register(payrollPeriodRoutes, {
     database,
     environment,
     prefix: '/api',
   });
   await app.register(statutoryConfigurationRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
+  await app.register(operationsRoutes, {
     database,
     environment,
     prefix: '/api',
