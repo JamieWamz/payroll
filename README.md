@@ -52,6 +52,17 @@ and accounting firms.
 - Authenticated statutory-configuration list/detail/create/verify/retire
   workflows with source evidence, reviewer attestation, optimistic versions,
   immutable verified history, and official PAYE/contribution reference data.
+- Effective-dated company gratuity policies and exact contract-expiry benefit
+  previews, gated on an applicable verified labour-sourced configuration.
+  These are not posted settlements or automatic employee entitlements.
+- Industry/category profiles and verified-rule monthly basic-pay checks (not
+  whole-law compliance certification).
+- Immutable operator-defined bank/PAYE CSV templates and validated preview
+  downloads. All 15 listed bank connections are explicitly disconnected;
+  TaxOnline upload certification and finalized-payroll extraction are pending.
+- A responsive authenticated workspace for employee and period creation,
+  gratuity policies/previews, wage checks, and CSV template mapping. It replaces
+  the former static progress page and resets company data on tenant switches.
 - Forced-RLS credential, server-side session, and append-only audit tables.
   The runtime role has no direct access to those tables; only a tenant-checked
   audit append function is currently exposed.
@@ -117,6 +128,10 @@ Tenant-authorized statutory-configuration HTTP decisions are recorded in
 [ADR 0012](docs/decisions/0012-tenant-authorized-statutory-configuration-http.md).
 The externally researched interaction direction is recorded in the
 [product design guidelines](docs/product-design-guidelines.md).
+Gratuity scope and legal limitations are recorded in
+[ADR 0013](docs/decisions/0013-contract-gratuity-policy-previews.md).
+Industry checks, bank onboarding gaps and TaxOnline export limitations are in
+[ADR 0014](docs/decisions/0014-industry-and-export-preparation.md).
 
 ## Technology
 
