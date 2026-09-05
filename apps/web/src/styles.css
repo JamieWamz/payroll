@@ -378,6 +378,30 @@ td input {
   flex-wrap: wrap;
   margin-top: 20px;
 }
+.resource-row {
+  padding: 14px 0;
+  border-top: 1px solid #e7ecf1;
+}
+.resource-row a {
+  color: #086d65;
+  display: inline-block;
+  margin-right: 20px;
+  font-weight: 600;
+}
+.resource-row p {
+  margin: 8px 0 0;
+}
+.review-confirmation {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  margin-top: 20px;
+}
+.review-confirmation input {
+  width: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+}
 .mapping-row {
   display: grid;
   grid-template-columns: 1fr 1fr auto;

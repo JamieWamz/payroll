@@ -1,4 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import {
+  fnbBatchSchema,
+  renderFnbZambiaBatch,
+} from '../modules/operations/fnb-zambia.js';
+import { integrationResources } from '../modules/operations/integration-resources.js';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import type { Environment } from '../config/environment.js';
@@ -67,6 +72,7 @@ export const operationsRoutes: FastifyPluginAsync<{
     );
     return reply.header('cache-control', 'no-store').send({
       items: records,
+      resources: integrationResources,
       banks: bankNames.map((name) => ({
         name,
         connectionStatus: 'not_connected',
@@ -75,6 +81,63 @@ export const operationsRoutes: FastifyPluginAsync<{
         'https://www.boz.zm/Public_Notice_Deposit_Insurance_Scheme.pdf',
     });
   });
+  app.post(
+    '/companies/:companyId/operations/fnb-zambia-preview',
+    async (request, reply) => {
+      const { companyId } = parse(paramsSchema, request.params);
+      const parsed = fnbBatchSchema.safeParse(request.body);
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        throw new ApiError(
+          400,
+          `Invalid FNB batch field: ${issue?.path.join('.') ?? 'batch'}. Check field length, account type, numeric accounts and two-decimal amounts.`,
+        );
+      }
+      const csv = await withAuthorizedCompanyTransaction(
+        options.database,
+        {
+          companyId,
+          environment: options.environment,
+          permission: 'payroll.read',
+          requireCsrf: true,
+          request,
+        },
+        async (transaction, principal) => {
+          const today = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Africa/Lusaka',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date());
+          let rendered: string;
+          try {
+            rendered = renderFnbZambiaBatch(parsed.data, today);
+          } catch (error) {
+            throw new ApiError(
+              400,
+              error instanceof Error ? error.message : 'Invalid FNB batch',
+            );
+          }
+          await appendSuccessfulAuditEvent(transaction, principal, request.id, {
+            eventType: 'operations.fnb-preview-generated',
+            targetId: companyId,
+            targetType: 'company',
+          });
+          return rendered;
+        },
+      );
+      return reply
+        .header('cache-control', 'no-store')
+        .header(
+          'content-disposition',
+          'attachment; filename="fnb-zambia-review.csv"',
+        )
+        .header('x-export-format', 'FNB-ZM-CSV-1')
+        .header('x-export-status', 'bank-validation-required')
+        .type('text/csv; charset=utf-8')
+        .send(csv);
+    },
+  );
   app.post('/companies/:companyId/operations', async (request, reply) => {
     const { companyId } = parse(paramsSchema, request.params);
     const body = parse(saveSchema, request.body);

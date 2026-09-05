@@ -36,6 +36,14 @@ export interface Operation {
   settings: Record<string, unknown>;
 }
 export interface Operations {
+  resources?: {
+    id: string;
+    purpose: string;
+    title: string;
+    status: string;
+    sourceUri: string;
+    guideUri?: string;
+  }[];
   items: Operation[];
   banks: { name: string; connectionStatus: string }[];
 }

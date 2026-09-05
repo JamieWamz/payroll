@@ -60,6 +60,11 @@ and accounting firms.
 - Immutable operator-defined bank/PAYE CSV templates and validated preview
   downloads. All 15 listed bank connections are explicitly disconnected;
   TaxOnline upload certification and finalized-payroll extraction are pending.
+- A bank-specific FNB Zambia CSV review-file generator based on its public
+  template and guides, with preamble, exact column layout, integer account
+  control total and input validation. Bank acceptance/live payments remain
+  pending. Official ZRA PAYE reference-form and filing-guide links are exposed
+  in the workspace; the authenticated bulk-upload template is still required.
 - A responsive authenticated workspace for employee and period creation,
   gratuity policies/previews, wage checks, and CSV template mapping. It replaces
   the former static progress page and resets company data on tenant switches.
@@ -132,6 +137,8 @@ Gratuity scope and legal limitations are recorded in
 [ADR 0013](docs/decisions/0013-contract-gratuity-policy-previews.md).
 Industry checks, bank onboarding gaps and TaxOnline export limitations are in
 [ADR 0014](docs/decisions/0014-industry-and-export-preparation.md).
+Current source acquisition and bank-specific format status are in the
+[integration source register](docs/integration-source-register.md).
 
 ## Technology
 

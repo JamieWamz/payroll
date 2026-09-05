@@ -3,6 +3,7 @@ import { message, request } from './api';
 import { DataTable, EntryForm, Loading } from './components';
 import { useRemote } from './useRemote';
 import type { CompanyProps, Operations } from './Workspace';
+import { FnbBatch } from './FnbBatch';
 
 const fields = {
   employeeNumber: 'Employee number',
@@ -84,6 +85,36 @@ export function ExportWorkspace({
           )}
         </section>
       )}
+      {data?.resources && (
+        <section className="card">
+          <h2>Official resources & integration status</h2>
+          {data.resources
+            .filter((item) => item.purpose === purpose)
+            .map((item) => (
+              <div className="resource-row" key={item.id}>
+                <a href={item.sourceUri} target="_blank" rel="noreferrer">
+                  {item.title} ↗
+                </a>
+                {item.guideUri && (
+                  <a href={item.guideUri} target="_blank" rel="noreferrer">
+                    Official guide ↗
+                  </a>
+                )}
+                <p className="muted">
+                  {item.id === 'fnb-zambia-csv'
+                    ? 'Published file layout implemented below. Live connection and bank acceptance still pending.'
+                    : item.id === 'zra-taxonline'
+                      ? 'Sign in directly with ZRA to obtain the current PAYE bulk-upload template. Never share your password here.'
+                      : 'Official reference form, not a CSV/XLSX upload template. Do not rename this PDF to CSV.'}
+                </p>
+              </div>
+            ))}
+        </section>
+      )}
+      {salary &&
+        data?.resources?.some((item) => item.id === 'fnb-zambia-csv') && (
+          <FnbBatch base={base} csrf={csrf} />
+        )}
       <section className="card">
         <h2>{salary ? 'Salary batch' : 'PAYE return'} templates</h2>
         <p className="muted">

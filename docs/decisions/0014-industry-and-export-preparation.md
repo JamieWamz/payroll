@@ -2,6 +2,11 @@
 
 Date: 2026-09-05. Status: Accepted for preparation and preview only.
 
+Update: FNB Zambia's published CSV template and guide have since been located
+and a dedicated review-file generator implemented. See the
+[integration source register](../integration-source-register.md) for exact
+scope, source fingerprint and the remaining bank/TaxOnline dependencies.
+
 ## Honest integration boundary
 
 The user confirmed that “ZRA SmartSearch CSV” means the **TaxOnline PAYE

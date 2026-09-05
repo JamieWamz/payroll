@@ -267,6 +267,64 @@ describe.runIf(
     );
     expect(settingsAudit.rows).toHaveLength(2);
 
+    const fnbPayload = {
+      ownAccount: '62000031451',
+      actionDate: new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Africa/Lusaka',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date()),
+      rows: [
+        {
+          recipientName: 'Jane Banda',
+          recipientAccount: '00123456789',
+          accountType: '1',
+          branchCode: '260006',
+          amount: '2000.50',
+          ownReference: 'EMP001',
+          recipientReference: 'SALARY',
+        },
+      ],
+    };
+    const fnbResponse = await requireApp().inject({
+      method: 'POST',
+      url: `${operationsUrl}/fnb-zambia-preview`,
+      headers: authHeaders(primary),
+      payload: fnbPayload,
+    });
+    expect(fnbResponse.statusCode).toBe(200);
+    expect(fnbResponse.headers['x-export-status']).toBe(
+      'bank-validation-required',
+    );
+    expect(fnbResponse.body).toContain('62000031451,062123488240');
+    const fnbNoCsrf = await requireApp().inject({
+      method: 'POST',
+      url: `${operationsUrl}/fnb-zambia-preview`,
+      headers: { cookie: primary.cookie },
+      payload: fnbPayload,
+    });
+    expect(fnbNoCsrf.statusCode).toBe(403);
+    const fnbForeign = await requireApp().inject({
+      method: 'POST',
+      url: `/api/companies/${secondary.companyId}/operations/fnb-zambia-preview`,
+      headers: authHeaders(primary),
+      payload: fnbPayload,
+    });
+    expect(fnbForeign.statusCode).toBe(403);
+    const fnbBadInput = await requireApp().inject({
+      method: 'POST',
+      url: `${operationsUrl}/fnb-zambia-preview`,
+      headers: authHeaders(primary),
+      payload: { ...fnbPayload, ownAccount: 'invalid' },
+    });
+    expect(fnbBadInput.statusCode).toBe(400);
+    const fnbAudit = await requireMigrationPool().query(
+      'SELECT id FROM app.audit_events WHERE company_id = $1 AND event_type = $2',
+      [primary.companyId, 'operations.fnb-preview-generated'],
+    );
+    expect(fnbAudit.rows).toHaveLength(1);
+
     const runtime = createPostgresDatabase(
       loadEnvironment({ DATABASE_URL: testDatabaseUrl!, NODE_ENV: 'test' }),
     );
