@@ -205,6 +205,58 @@ preserving the database volume:
 npm run db:down
 ```
 
+### Run on Jamie's current localhost setup
+
+Use these commands for the existing checkout at `/home/jamie/payroll`. This
+machine's payroll PostgreSQL container publishes port `55433`; the API uses
+`3100` to avoid other applications, and the frontend uses `5173`. Dependencies,
+the private `.env` file and database migrations are already set up here.
+These overrides do not modify `.env` or expose its database password.
+
+```sh
+cd /home/jamie/payroll
+
+# Stop the background instance before starting one in this terminal.
+# Skip this line if zampayroll-local.service is not loaded.
+systemctl --user stop zampayroll-local.service
+
+# Use this machine's payroll database.
+export DATABASE_URL="$(node --env-file=.env -e '
+const url = new URL(process.env.COMPOSE_DATABASE_URL);
+url.hostname = "127.0.0.1";
+url.port = "55433";
+process.stdout.write(url.href);
+')"
+
+# Start both frontend and API.
+HOST=127.0.0.1 PORT=3100 \
+WEB_ORIGIN=http://localhost:5173 \
+API_PROXY_TARGET=http://127.0.0.1:3100 \
+SESSION_COOKIE_SECURE=false \
+npm run dev
+```
+
+Open <http://localhost:5173>. Keep the terminal open while using the portal;
+press `Ctrl+C` to stop the frontend and API. The insecure-cookie override is
+only for local HTTP development, not production.
+
+If the existing database container is stopped, start it before `npm run dev`:
+
+```sh
+docker start zampayroll-postgres-1
+```
+
+Wait for PostgreSQL to become healthy. In another terminal, confirm the portal
+can reach both the API and database:
+
+```sh
+curl --fail http://localhost:5173/api/health/ready
+```
+
+A ready system returns `{"service":"zampayroll-api","status":"ready"}`.
+This is a machine-specific alternative to the default host and Compose
+workflows; do not start both on the same ports.
+
 ### Run the complete Compose stack
 
 The base Compose file does not publish PostgreSQL to the host. It runs a
