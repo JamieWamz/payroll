@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { message, request } from './api';
 
 export function useRemote<T>(path: string, revision = 0) {
-  const [data, setData] = useState<T>();
+  const [snapshot, setSnapshot] = useState<{ path: string; data: T }>();
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
     void request<T>(path, { signal: controller.signal })
       .then((value) => {
         if (!controller.signal.aborted) {
-          setData(value);
+          setSnapshot({ path, data: value });
           setError('');
         }
       })
@@ -18,5 +18,8 @@ export function useRemote<T>(path: string, revision = 0) {
       });
     return () => controller.abort();
   }, [path, revision]);
-  return { data: error ? undefined : data, error };
+  return {
+    data: error || snapshot?.path !== path ? undefined : snapshot?.data,
+    error,
+  };
 }

@@ -18,6 +18,9 @@ import { compensationRoutes } from './routes/compensation.js';
 import { gratuityPolicyRoutes } from './routes/gratuity-policies.js';
 import { healthRoutes } from './routes/health.js';
 import { payrollPeriodRoutes } from './routes/payroll-periods.js';
+import { payrollRunRoutes } from './routes/payroll-runs.js';
+import { payrollDetailsRoutes } from './routes/payroll-details.js';
+import { payrollDocumentRoutes } from './routes/payroll-documents.js';
 import { operationsRoutes } from './routes/operations.js';
 import { statutoryConfigurationRoutes } from './routes/statutory-configurations.js';
 
@@ -100,6 +103,21 @@ export async function buildApp({
     prefix: '/api',
   });
   await app.register(statutoryConfigurationRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
+  await app.register(payrollRunRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
+  await app.register(payrollDetailsRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
+  await app.register(payrollDocumentRoutes, {
     database,
     environment,
     prefix: '/api',

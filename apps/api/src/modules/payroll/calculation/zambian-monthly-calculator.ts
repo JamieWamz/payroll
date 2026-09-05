@@ -459,3 +459,10 @@ function invalidCalculation(rule: string): DomainError {
     { entity: 'PayrollCalculation', rule },
   );
 }
+
+/** Validate a proposed monthly rule set without activating it or running payroll. */
+export function validateMonthlyPayrollParameters(
+  value: Record<string, unknown>,
+): void {
+  parseParameters(value);
+}

@@ -1,19 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { message, request, type Session } from './api';
 import { DataTable, EntryForm, Loading, type Field } from './components';
 import { useRemote } from './useRemote';
 import { ExportWorkspace } from './exports';
+import { Employees } from './Employees';
+import { Payroll } from './Payroll';
+import { Dashboard } from './Dashboard';
+import { Reports, Filings } from './Reports';
+import { Settings, StatutoryRules } from './Settings';
 
 const pages = [
   'Overview',
   'People',
+  'Payroll',
   'Payroll periods',
   'Gratuity',
   'Compliance',
   'Bank batches',
   'ZRA returns',
+  'Reports',
+  'Statutory rules',
+  'Settings',
 ] as const;
-type Page = (typeof pages)[number];
+export type Page = (typeof pages)[number];
 interface Policy {
   id: string;
   name: string;
@@ -60,7 +69,20 @@ export function Workspace({
   onLogout: () => void;
 }) {
   const [companyId, setCompanyId] = useState(session.companies[0]?.id ?? '');
-  const [page, setPage] = useState<Page>('Overview');
+  const [page, setPage] = useState<Page>(() => readPage());
+  useEffect(() => {
+    const changed = () => setPage(readPage());
+    window.addEventListener('hashchange', changed);
+    window.addEventListener('popstate', changed);
+    return () => {
+      window.removeEventListener('hashchange', changed);
+      window.removeEventListener('popstate', changed);
+    };
+  }, []);
+  const navigate = (next: Page) => {
+    window.history.pushState(null, '', `#${encodeURIComponent(next)}`);
+    setPage(next);
+  };
   const [error, setError] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
   const company = session.companies.find((item) => item.id === companyId);
@@ -92,7 +114,7 @@ export function Workspace({
             <button
               key={item}
               aria-current={page === item ? 'page' : undefined}
-              onClick={() => setPage(item)}
+              onClick={() => navigate(item)}
             >
               <span aria-hidden="true">
                 {String(index + 1).padStart(2, '0')}
@@ -131,8 +153,9 @@ export function Workspace({
           <span className="badge">ZMW · Zambia</span>
         </header>
         <p className="development-banner">
-          Development workspace. Calculations shown here are previews; bank
-          payments and ZRA submission are not connected.
+          Bank payments and direct statutory submission are not connected.
+          Finalized payroll records and external filing statuses are tracked
+          separately.
         </p>
         {error && (
           <p role="alert" className="notice error">
@@ -145,6 +168,7 @@ export function Workspace({
             page={page}
             base={`/companies/${company.id}`}
             csrf={session.csrfToken}
+            navigate={navigate}
           />
         ) : (
           <p className="empty">
@@ -156,154 +180,42 @@ export function Workspace({
   );
 }
 
-function CompanyPage({ page, ...props }: CompanyProps & { page: Page }) {
-  if (page === 'People') return <People {...props} />;
+function readPage(): Page {
+  let value: string;
+  try {
+    value = decodeURIComponent(window.location.hash.slice(1));
+  } catch {
+    return 'Overview';
+  }
+  return pages.includes(value as Page) ? (value as Page) : 'Overview';
+}
+
+function CompanyPage({
+  page,
+  navigate,
+  ...props
+}: CompanyProps & { page: Page; navigate: (page: Page) => void }) {
+  if (page === 'People') return <Employees {...props} />;
+  if (page === 'Payroll') return <Payroll {...props} />;
+  if (page === 'Reports') return <Reports {...props} />;
+  if (page === 'Settings') return <Settings {...props} />;
+  if (page === 'Statutory rules') return <StatutoryRules {...props} />;
   if (page === 'Payroll periods') return <Periods {...props} />;
   if (page === 'Gratuity') return <Gratuity {...props} />;
   if (page === 'Compliance') return <Compliance {...props} />;
-  if (page === 'Bank batches' || page === 'ZRA returns')
+  if (page === 'ZRA returns')
     return (
-      <ExportWorkspace
-        {...props}
-        purpose={page === 'Bank batches' ? 'salary_batch' : 'paye_return'}
-      />
+      <>
+        <Filings {...props} />
+        <details className="advanced-section">
+          <summary>PAYE export templates & reference guides</summary>
+          <ExportWorkspace {...props} purpose="paye_return" />
+        </details>
+      </>
     );
-  return <Overview {...props} />;
-}
-
-function Overview({ base }: CompanyProps) {
-  const { data, error } = useRemote<{ items: Configuration[] }>(
-    `${base}/statutory-configurations?limit=100`,
-  );
-  return (
-    <>
-      <section className="welcome-card">
-        <p className="eyebrow">PAYROLL PREPARATION</p>
-        <h2>A clear view of what comes next.</h2>
-        <p>
-          Maintain your people, schedule pay periods and document the policies
-          that guide each calculation.
-        </p>
-      </section>
-      <div className="summary-grid">
-        {[
-          [
-            '01',
-            'People & periods',
-            'Create employee records and regular or off-cycle pay periods.',
-          ],
-          [
-            '02',
-            'Policies & evidence',
-            'Set company gratuity policies and review industry wage requirements.',
-          ],
-          [
-            '03',
-            'Exports for review',
-            'Map bank and PAYE fields to operator-supplied templates.',
-          ],
-        ].map(([number, title, text]) => (
-          <section className="card" key={number}>
-            <span className="step-number">{number}</span>
-            <h2>{title}</h2>
-            <p>{text}</p>
-          </section>
-        ))}
-      </div>
-      <section className="card">
-        <h2>Statutory configuration register</h2>
-        <p className="muted">
-          Verification is recorded by your authorized reviewer. It is not
-          regulatory certification. This view lists up to 100 versions.
-        </p>
-        {data ? (
-          <DataTable
-            columns={['Version', 'Effective from', 'Effective to', 'Status']}
-            rows={data.items.map((item) => [
-              item.version,
-              item.effectiveFrom,
-              item.effectiveTo ?? 'Open-ended',
-              <span className="badge">{item.status}</span>,
-            ])}
-            empty="No statutory configurations. An authorized reviewer must configure and verify sourced rules through the statutory API before calculation previews can run."
-          />
-        ) : (
-          <Loading error={error} />
-        )}
-      </section>
-      <p className="notice">
-        Payroll-run calculation/finalization, payslips and automatic report
-        generation from finalized payroll are still being built. No live payroll
-        is ready to submit.
-      </p>
-    </>
-  );
-}
-
-function People({ base, csrf }: CompanyProps) {
-  const [revision, setRevision] = useState(0);
-  const { data, error } = useRemote<{
-    items: {
-      id: string;
-      employeeNumber: string;
-      givenName: string;
-      familyName: string;
-      status: string;
-    }[];
-  }>(`${base}/employees?limit=100`, revision);
-  return (
-    <>
-      <section className="card">
-        <h2>Employee directory</h2>
-        <p className="muted">Showing up to 100 employee records.</p>
-        {data ? (
-          <DataTable
-            columns={['Employee number', 'Name', 'Status']}
-            rows={data.items.map((item) => [
-              item.employeeNumber,
-              `${item.givenName} ${item.familyName}`,
-              item.status,
-            ])}
-            empty="No employees yet. Add the first person below."
-          />
-        ) : (
-          <Loading error={error} />
-        )}
-      </section>
-      <EntryForm
-        title="Add an employee"
-        submit="Save employee"
-        fields={[
-          { name: 'employeeNumber', label: 'Employee number' },
-          { name: 'givenName', label: 'First name' },
-          { name: 'familyName', label: 'Last name' },
-          { name: 'positionTitle', label: 'Job title' },
-          { name: 'startsOn', label: 'Employment start', type: 'date' },
-          {
-            name: 'endsOn',
-            label: 'Contract end (optional)',
-            type: 'date',
-            optional: true,
-          },
-        ]}
-        action={async ({ positionTitle, startsOn, endsOn, ...values }) => {
-          await request(`${base}/employees`, {
-            csrf,
-            body: {
-              ...values,
-              employment: {
-                positionTitle,
-                startsOn,
-                ...(endsOn ? { endsOn } : {}),
-              },
-            },
-          });
-          setRevision((value) => value + 1);
-          return 'Employee saved.';
-        }}
-      />
-    </>
-  );
+  if (page === 'Bank batches')
+    return <ExportWorkspace {...props} purpose="salary_batch" />;
+  return <Dashboard {...props} navigate={navigate} />;
 }
 
 function Periods({ base, csrf }: CompanyProps) {

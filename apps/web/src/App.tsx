@@ -113,6 +113,7 @@ export function App() {
               { body: values },
             );
             setError('');
+            setRegister(false);
             setSession(value);
             return '';
           }}

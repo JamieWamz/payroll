@@ -19,6 +19,7 @@ export async function request<T>(
     method?: string;
     signal?: AbortSignal;
     text?: boolean;
+    blob?: boolean;
   } = {},
 ): Promise<T> {
   const response = await fetch(`/api${path}`, {
@@ -49,10 +50,34 @@ export async function request<T>(
     );
   }
   if (response.status === 204) return undefined as T;
-  return (options.text ? await response.text() : await response.json()) as T;
+  return (
+    options.blob
+      ? await response.blob()
+      : options.text
+        ? await response.text()
+        : await response.json()
+  ) as T;
 }
 export function message(error: unknown): string {
   return error instanceof Error
     ? error.message
     : 'The request could not be completed.';
+}
+
+export function saveFile(content: Blob | string, filename: string) {
+  const url = URL.createObjectURL(
+    typeof content === 'string'
+      ? new Blob([content], { type: 'text/csv;charset=utf-8' })
+      : content,
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+export async function download(path: string, filename: string) {
+  saveFile(await request<Blob>(path, { blob: true }), filename);
 }

@@ -41,6 +41,7 @@ function json(value: unknown, status = 200) {
 }
 afterEach(() => {
   cleanup();
+  window.history.replaceState(null, '', '/');
   vi.unstubAllGlobals();
 });
 
@@ -48,12 +49,26 @@ describe('authenticated payroll workspace', () => {
   it('saves a PAYE template using operator headings and explicit layout settings', async () => {
     const fetcher = vi.fn(async (url: string, init: RequestInit) => {
       if (url.endsWith('/auth/session')) return json(session);
+      if (url.endsWith('/payroll-overview'))
+        return json({
+          counts: {
+            employees: 0,
+            missingSalaries: 0,
+            verifiedRules: 0,
+            periods: 0,
+          },
+          runs: [],
+          latest: null,
+        });
       if (init.method === 'POST') return json({ id: 'template' }, 201);
       return json({ items: [], banks: [] });
     });
     vi.stubGlobal('fetch', fetcher);
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: /ZRA returns/ }));
+    fireEvent.click(
+      screen.getByText('PAYE export templates & reference guides'),
+    );
     fireEvent.change(screen.getByLabelText('Template name'), {
       target: { value: 'PAYE review layout' },
     });
@@ -98,6 +113,17 @@ describe('authenticated payroll workspace', () => {
   it('submits preview rows in StrictMode and reports server validation failures without downloading', async () => {
     const fetcher = vi.fn(async (url: string) => {
       if (url.endsWith('/auth/session')) return json(session);
+      if (url.endsWith('/payroll-overview'))
+        return json({
+          counts: {
+            employees: 0,
+            missingSalaries: 0,
+            verifiedRules: 0,
+            periods: 0,
+          },
+          runs: [],
+          latest: null,
+        });
       if (url.endsWith('/export-preview'))
         return json({ message: 'Account number is missing or invalid' }, 400);
       return json({
@@ -129,7 +155,7 @@ describe('authenticated payroll workspace', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: /Bank batches/ }),
     );
-    await screen.findByRole('option', { name: 'Salary review' });
+    await screen.findAllByRole('option', { name: 'Salary review' });
     fireEvent.change(screen.getByLabelText('Export template'), {
       target: { value: 'template' },
     });
@@ -165,18 +191,27 @@ describe('authenticated payroll workspace', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) =>
-        url.endsWith('/auth/session') ? json(session) : json({ items: [] }),
+        url.endsWith('/auth/session')
+          ? json(session)
+          : json({
+              counts: {
+                employees: 0,
+                missingSalaries: 0,
+                verifiedRules: 0,
+                periods: 0,
+              },
+              runs: [],
+              latest: null,
+            }),
       ),
     );
     render(<App />);
     expect(
       await screen.findByRole('heading', { name: 'Overview' }),
     ).toBeInTheDocument();
+    expect(await screen.findByText(/Awaiting calculation/)).toBeInTheDocument();
     expect(
-      screen.getByText(/No live payroll is ready to submit/),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByText(/No statutory configurations/),
+      await screen.findByText(/No verified configuration covers today/),
     ).toBeInTheDocument();
   });
   it('signs in through the actual auth contract and signs out with CSRF', async () => {
@@ -184,6 +219,17 @@ describe('authenticated payroll workspace', () => {
       if (url.endsWith('/auth/session'))
         return json({ message: 'Authentication required' }, 401);
       if (url.endsWith('/auth/login')) return json(session);
+      if (url.endsWith('/payroll-overview'))
+        return json({
+          counts: {
+            employees: 0,
+            missingSalaries: 0,
+            verifiedRules: 0,
+            periods: 0,
+          },
+          runs: [],
+          latest: null,
+        });
       if (url.endsWith('/auth/logout'))
         return new Response(null, { status: 204 });
       return json({ items: [] });
@@ -246,10 +292,31 @@ describe('authenticated payroll workspace', () => {
     let saved = false;
     const fetcher = vi.fn(async (url: string, init: RequestInit) => {
       if (url.endsWith('/auth/session')) return json(session);
+      if (url.endsWith('/payroll-overview'))
+        return json({
+          counts: {
+            employees: 0,
+            missingSalaries: 0,
+            verifiedRules: 0,
+            periods: 0,
+          },
+          runs: [],
+          latest: null,
+        });
       if (url.endsWith('/employees')) {
         saved = true;
-        return json({}, 201);
+        return json({ id: 'employee' }, 201);
       }
+      if (url.endsWith('/employees/employee'))
+        return json({
+          id: 'employee',
+          employeeNumber: 'EMP001',
+          givenName: 'Jane',
+          familyName: 'Banda',
+          status: 'active',
+          version: 1,
+          employments: [],
+        });
       if (url.includes('/employees?'))
         return json({
           items: saved
@@ -269,6 +336,7 @@ describe('authenticated payroll workspace', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: /People/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add employee' }));
     for (const [label, value] of [
       ['Employee number', 'EMP001'],
       ['First name', 'Jane'],
@@ -299,6 +367,17 @@ describe('authenticated payroll workspace', () => {
       'fetch',
       vi.fn(async (url: string) => {
         if (url.endsWith('/auth/session')) return json(session);
+        if (url.endsWith('/payroll-overview'))
+          return json({
+            counts: {
+              employees: 0,
+              missingSalaries: 0,
+              verifiedRules: 0,
+              periods: 0,
+            },
+            runs: [],
+            latest: null,
+          });
         if (url.includes('company-a/employees'))
           return new Promise<Response>((resolve) => {
             finishOld = resolve;
@@ -320,6 +399,7 @@ describe('authenticated payroll workspace', () => {
     );
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: /People/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add employee' }));
     fireEvent.change(screen.getByLabelText('First name'), {
       target: { value: 'Unsaved Alpha' },
     });
@@ -328,6 +408,7 @@ describe('authenticated payroll workspace', () => {
       target: { value: 'company-b' },
     });
     expect(await screen.findByText('Beta Person')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add employee' }));
     expect(screen.getByLabelText('First name')).toHaveValue('');
     await act(async () => {
       finishOld?.(
@@ -352,6 +433,17 @@ describe('authenticated payroll workspace', () => {
       'fetch',
       vi.fn(async (url: string) => {
         if (url.endsWith('/auth/session')) return json(session);
+        if (url.endsWith('/payroll-overview'))
+          return json({
+            counts: {
+              employees: 0,
+              missingSalaries: 0,
+              verifiedRules: 0,
+              periods: 0,
+            },
+            runs: [],
+            latest: null,
+          });
         if (url.includes('/employees'))
           return json({ message: 'Authentication required' }, 401);
         return json({ items: [] });
@@ -372,12 +464,23 @@ describe('authenticated payroll workspace', () => {
       vi.fn(async (url: string) =>
         url.endsWith('/auth/session')
           ? json(session)
-          : json({
-              items: [],
-              banks: [
-                { name: 'Example bank', connectionStatus: 'not_connected' },
-              ],
-            }),
+          : url.endsWith('/payroll-overview')
+            ? json({
+                counts: {
+                  employees: 0,
+                  missingSalaries: 0,
+                  verifiedRules: 0,
+                  periods: 0,
+                },
+                runs: [],
+                latest: null,
+              })
+            : json({
+                items: [],
+                banks: [
+                  { name: 'Example bank', connectionStatus: 'not_connected' },
+                ],
+              }),
       ),
     );
     render(<App />);
@@ -387,6 +490,9 @@ describe('authenticated payroll workspace', () => {
     expect(await screen.findByText('Not connected')).toBeInTheDocument();
     expect(screen.getByText(/No funds can be sent/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ZRA returns/ }));
+    fireEvent.click(
+      screen.getByText('PAYE export templates & reference guides'),
+    );
     expect(screen.getByText(/not certified return files/)).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Column mapping' }),

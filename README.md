@@ -3,18 +3,29 @@
 ZamPayroll is a Zambia-specific payroll SaaS under active development for SMEs
 and accounting firms.
 
-> [!WARNING]
-> **Phase 1 is complete and Phase 2 application work is in progress.** The
-> system now implements registration, login, secure session restoration, and
-> logout, plus tenant-authorized company, workforce, and effective-dated
-> compensation workflows, payroll-period creation/history, and statutory
-> configuration administration. It does not yet expose payroll calculation or
-> finalization and has no approved 2026 statutory configuration. The isolated
-> calculator is not yet available through the API;
-> payslips and statutory reports are also not implemented. No unverified rate
-> should be used for real payroll. The current application is not production-ready.
+> [!IMPORTANT]
+> The application now connects employee management, monthly payroll calculation,
+> review/finalization, PDF payslips, CSV reports and an audited manual filing
+> register. It requires operator-verified statutory rules; no approved 2026
+> configuration is bundled. Direct bank payments and authority submission are not
+> connected. Partial-month allocations, finalized corrections and certified P9 /
+> TaxOnline formats remain outside the implemented monthly workflow.
+>
+> Read [Payroll workspace operations](docs/payroll-workflows.md) for supported
+> behavior, setup and integration limitations, and the
+> [product audit](docs/product-audit.md) for the starting architecture and gaps.
 
 ## What exists today
+
+- A live payroll overview, URL-backed workspace navigation, searchable/paginated
+  employee directory, grouped profiles, salary/component maintenance and settings.
+- Tenant-authorized monthly payroll creation, calculation, review, cancellation /
+  replacement and immutable finalization, with exact historical tax context,
+  reviewed opening balances and detection of changes after calculation.
+- Finalized-snapshot PDF payslips/registers, CSV earnings and statutory schedules,
+  payment instructions, annual tax working papers and manual filing history.
+- Persisted employee/employer statutory identifiers, banking information, CSRF and
+  permission checks on mutations, plus integration/browser workflow tests.
 
 - A TypeScript npm workspace with a React/Vite web application and a Fastify
   API.
@@ -59,7 +70,7 @@ and accounting firms.
   whole-law compliance certification).
 - Immutable operator-defined bank/PAYE CSV templates and validated preview
   downloads. All 15 listed bank connections are explicitly disconnected;
-  TaxOnline upload certification and finalized-payroll extraction are pending.
+  TaxOnline upload certification remains pending; finalized-payroll reports are available separately.
 - A bank-specific FNB Zambia CSV review-file generator based on its public
   template and guides, with preamble, exact column layout, integer account
   control total and input validation. Bank acceptance/live payments remain
@@ -98,9 +109,8 @@ and accounting firms.
 - Unit, API, frontend, and PostgreSQL integration test foundations.
 - Shared linting, formatting, type-checking, build, and CI gates.
 
-The architecture and controls planned for later payroll work are documented in
-[docs/architecture.md](docs/architecture.md). They are future design
-constraints, not implemented features.
+The original architecture is documented in [docs/architecture.md](docs/architecture.md).
+The current supported workflow is documented in [payroll operations](docs/payroll-workflows.md).
 
 The accepted Phase 2 sequencing and security boundary is recorded in
 [ADR 0001](docs/decisions/0001-phase-2-domain-boundaries.md). In particular,

@@ -9,6 +9,8 @@ export default tseslint.config(
   {
     ignores: [
       '**/coverage/**',
+      'test-results/**',
+      'playwright-report/**',
       '**/dist/**',
       '**/node_modules/**',
       '**/*.config.js',
@@ -17,7 +19,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['apps/api/**/*.{ts,tsx}'],
+    files: ['apps/api/**/*.{ts,tsx}', 'tests/**/*.ts', 'playwright.config.ts'],
     languageOptions: {
       globals: globals.node,
     },

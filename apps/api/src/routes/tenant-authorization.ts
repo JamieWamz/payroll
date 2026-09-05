@@ -101,6 +101,14 @@ export async function withAuthorizedCompanyTransaction<Result>(
       throw error;
     }
 
+    // Serialize company mutations with payroll calculation/finalization. This also
+    // covers new compensation rows, which row locks alone cannot protect.
+    if (options.requireCsrf === true) {
+      await transaction.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`${companyId}:payroll`],
+      );
+    }
     return operation(transaction, principal);
   });
 }

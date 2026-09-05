@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { message, request } from './api';
+import { download, message, request } from './api';
 import { DataTable, EntryForm, Loading } from './components';
 import { useRemote } from './useRemote';
 import type { CompanyProps, Operations } from './Workspace';
 import { FnbBatch } from './FnbBatch';
+import type { Run } from './payroll-types';
 
 const fields = {
   employeeNumber: 'Employee number',
@@ -42,6 +43,9 @@ export function ExportWorkspace({
   purpose,
 }: CompanyProps & { purpose: 'salary_batch' | 'paye_return' }) {
   const salary = purpose === 'salary_batch';
+  const payrollRuns = useRemote<{ items: Run[] }>(
+    `${base}/payroll-runs?limit=100`,
+  );
   const [revision, setRevision] = useState(0);
   const [selected, setSelected] = useState('');
   const [columns, setColumns] = useState<Column[]>(() =>
@@ -60,6 +64,37 @@ export function ExportWorkspace({
   const template = templates.find((item) => item.id === selected);
   return (
     <>
+      <EntryForm
+        title="Export finalized payroll"
+        submit="Download mapped payroll CSV"
+        fields={[
+          {
+            name: 'runId',
+            label: 'Finalized payroll',
+            options: (payrollRuns.data?.items ?? [])
+              .filter((r) => r.status === 'finalized')
+              .map((r) => ({ value: r.id, label: r.code })),
+          },
+          {
+            name: 'templateId',
+            label: 'Saved export template',
+            options: templates.map((t) => ({ value: t.id, label: t.name })),
+          },
+        ]}
+        action={async (values) => {
+          await download(
+            `${base}/payroll-runs/${values.runId}/template-export/${values.templateId}`,
+            'mapped-payroll.csv',
+          );
+          return 'Finalized payroll exported. No payment or return was submitted.';
+        }}
+      >
+        <p className="muted">
+          Use a saved layout reviewed against your provider’s requirements.
+          Amounts and identifiers come directly from the finalized record.
+        </p>
+        {payrollRuns.error && <Loading error={payrollRuns.error} />}
+      </EntryForm>
       <p className="notice">
         {salary
           ? 'Bank directory and configurable CSV previews—not live bank integrations. No funds can be sent from this workspace. Obtain your bank’s approved file layout and onboarding requirements.'
@@ -274,8 +309,8 @@ export function ExportWorkspace({
         <h2>Prepare a CSV preview</h2>
         <p>
           Enter review data against a saved template. Rows are not saved; they
-          are sent to the API for validation and download. Automatic extraction
-          from finalized payroll is not yet connected.
+          are sent to the API for validation and download. To use recorded
+          payroll amounts, choose Export finalized payroll above.
         </p>
         <label>
           Export template

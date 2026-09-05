@@ -25,3 +25,6 @@ webServerApiSettings.json
 # Test and tool caches
 .eslintcache
 .vite/
+
+/test-results/
+/playwright-report/

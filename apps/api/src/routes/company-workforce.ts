@@ -83,6 +83,9 @@ const employeeListSchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(50),
     status: z.enum(['active', 'archived']).optional(),
+    search: z.string().trim().max(160).default(''),
+    offset: z.coerce.number().int().min(0).max(1000000).default(0),
+    sort: z.enum(['name', 'number']).default('name'),
   })
   .strict();
 const employmentSchema = z
@@ -225,10 +228,17 @@ export const companyWorkforceRoutes: FastifyPluginAsync<
             FROM app.employees
             WHERE company_id = app.current_company_id()
               AND ($1::text IS NULL OR status = $1)
-            ORDER BY family_name, given_name, employee_number, id
-            LIMIT $2
+              AND ($3 = '' OR position(lower($3) in lower(employee_number || ' ' || given_name || ' ' || family_name)) > 0)
+            ORDER BY CASE WHEN $5 = 'number' THEN employee_number ELSE family_name END, given_name, employee_number, id
+            LIMIT $2 OFFSET $4
           `,
-          [query.status ?? null, query.limit],
+          [
+            query.status ?? null,
+            query.limit,
+            query.search,
+            query.offset,
+            query.sort,
+          ],
         );
         return result.rows;
       },

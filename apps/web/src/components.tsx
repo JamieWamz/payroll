@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { message } from './api';
 export interface Field {
   name: string;
@@ -8,6 +8,8 @@ export interface Field {
   options?: { value: string; label: string }[];
   hint?: string;
   maxLength?: number;
+  defaultValue?: string;
+  rows?: number;
 }
 export function EntryForm({
   title,
@@ -22,6 +24,7 @@ export function EntryForm({
   action: (values: Record<string, string>) => Promise<string>;
   children?: ReactNode;
 }) {
+  const formId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState('');
@@ -52,13 +55,14 @@ export function EntryForm({
       >
         <fieldset disabled={busy} className="fields">
           {fields.map((field) => (
-            <label key={field.name}>
-              {field.label}
+            <div key={field.name} className="form-field">
+              <label htmlFor={`${formId}-${field.name}`}>{field.label}</label>
               {field.options ? (
                 <select
+                  id={`${formId}-${field.name}`}
                   name={field.name}
                   required={!field.optional}
-                  defaultValue=""
+                  defaultValue={field.defaultValue ?? ''}
                 >
                   <option value="">Select…</option>
                   {field.options.map((option) => (
@@ -67,16 +71,35 @@ export function EntryForm({
                     </option>
                   ))}
                 </select>
+              ) : field.rows ? (
+                <textarea
+                  id={`${formId}-${field.name}`}
+                  name={field.name}
+                  rows={field.rows}
+                  required={!field.optional}
+                  defaultValue={field.defaultValue}
+                  maxLength={field.maxLength ?? 65536}
+                  aria-describedby={
+                    field.hint ? `${formId}-${field.name}-hint` : undefined
+                  }
+                />
               ) : (
                 <input
+                  id={`${formId}-${field.name}`}
                   name={field.name}
                   type={field.type ?? 'text'}
+                  defaultValue={field.defaultValue}
+                  aria-describedby={
+                    field.hint ? `${formId}-${field.name}-hint` : undefined
+                  }
                   required={!field.optional}
                   maxLength={field.maxLength ?? 240}
                 />
               )}
-              {field.hint && <small>{field.hint}</small>}
-            </label>
+              {field.hint && (
+                <small id={`${formId}-${field.name}-hint`}>{field.hint}</small>
+              )}
+            </div>
           ))}
           {children}
           <div className="form-actions">
@@ -109,7 +132,12 @@ export function DataTable({
   return rows.length === 0 ? (
     <p className="empty">{empty}</p>
   ) : (
-    <div className="table-wrap">
+    <div
+      className="table-wrap"
+      tabIndex={0}
+      role="region"
+      aria-label="Scrollable data table"
+    >
       <table>
         <thead>
           <tr>
@@ -142,5 +170,42 @@ export function Loading({ error }: { error: string }) {
     <p className="empty" role="status">
       Loading company records…
     </p>
+  );
+}
+
+export function ActionButton({
+  children,
+  action,
+  className = 'secondary',
+  disabled = false,
+}: {
+  children: ReactNode;
+  action: () => Promise<void>;
+  className?: string;
+  disabled?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <span className="action-control">
+      <button
+        className={className}
+        disabled={busy || disabled}
+        onClick={() => {
+          setBusy(true);
+          setError('');
+          void action()
+            .catch((e: unknown) => setError(message(e)))
+            .finally(() => setBusy(false));
+        }}
+      >
+        {busy ? 'Working…' : children}
+      </button>
+      {error && (
+        <span role="alert" className="action-error">
+          {error}
+        </span>
+      )}
+    </span>
   );
 }

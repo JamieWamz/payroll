@@ -38,6 +38,7 @@ RUN npm ci --omit=dev --workspace @zampayroll/api \
   && npm cache clean --force
 
 COPY --from=build --chown=node:node /workspace/apps/api/dist ./apps/api/dist
+COPY --from=build --chown=node:node /workspace/apps/api/assets ./apps/api/assets
 
 WORKDIR /workspace/apps/api
 USER node

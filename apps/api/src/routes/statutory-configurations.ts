@@ -8,6 +8,7 @@ import type {
   TenantTransaction,
 } from '../infrastructure/database.js';
 import {
+  validateMonthlyPayrollParameters,
   zambianPublishedContributionReference,
   zambianPublishedTerminalBenefitReference,
   zraPublishedMonthlyPayeReference,
@@ -225,6 +226,9 @@ export const statutoryConfigurationRoutes: FastifyPluginAsync<
                 ? {}
                 : { effectiveTo: body.effectiveTo }),
             });
+            if (created.parameters['schemaVersion'] === 'ZAMBIA-MONTHLY-1') {
+              validateMonthlyPayrollParameters(created.parameters);
+            }
             const existing = await loadDomainConfigurations(transaction);
             assertStatutoryConfigurationSchedule(companyId, [
               ...existing,
@@ -638,5 +642,15 @@ async function authorizeReferenceRead(
       request,
     },
     async () => undefined,
+  );
+}
+
+export async function loadPayrollConfiguration(
+  transaction: TenantTransaction,
+  id: string,
+) {
+  return toDomain(
+    await requireConfiguration(transaction, id),
+    await findSources(transaction, id),
   );
 }
