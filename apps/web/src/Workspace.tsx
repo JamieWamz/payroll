@@ -3,6 +3,9 @@ import { message, request, type Session } from './api';
 import { DataTable, EntryForm, Loading, type Field } from './components';
 import { useRemote } from './useRemote';
 import { ExportWorkspace } from './exports';
+import { Team } from './Team';
+import { Setup } from './Setup';
+import { Icon } from './Icon';
 import { Employees } from './Employees';
 import { Payroll } from './Payroll';
 import { Dashboard } from './Dashboard';
@@ -21,6 +24,8 @@ const pages = [
   'Reports',
   'Statutory rules',
   'Settings',
+  'Setup',
+  'Team',
 ] as const;
 export type Page = (typeof pages)[number];
 interface Policy {
@@ -59,6 +64,7 @@ export interface Operations {
 export interface CompanyProps {
   base: string;
   csrf: string;
+  permissions?: readonly string[];
 }
 
 export function Workspace({
@@ -70,6 +76,24 @@ export function Workspace({
 }) {
   const [companyId, setCompanyId] = useState(session.companies[0]?.id ?? '');
   const [page, setPage] = useState<Page>(() => readPage());
+  const access = useRemote<{ permissions?: string[] }>(
+    `/companies/${companyId}/access`,
+  );
+  const permissionByPage: Record<Page, string> = {
+    Overview: 'payroll.read',
+    People: 'workforce.read',
+    Payroll: 'payroll.read',
+    'Payroll periods': 'payroll.read',
+    Gratuity: 'compensation.read',
+    Compliance: 'workforce.read',
+    'Bank batches': 'reports.read',
+    'ZRA returns': 'reports.read',
+    Reports: 'reports.read',
+    'Statutory rules': 'statutory-config.read',
+    Settings: 'company.update',
+    Setup: 'company.update',
+    Team: 'users.manage',
+  };
   useEffect(() => {
     const changed = () => setPage(readPage());
     window.addEventListener('hashchange', changed);
@@ -108,22 +132,52 @@ export function Workspace({
             ))}
           </select>
         </label>
-        <p className="nav-label">WORKSPACE</p>
+
         <nav aria-label="Main navigation">
-          {pages.map((item, index) => (
-            <button
-              key={item}
-              aria-current={page === item ? 'page' : undefined}
-              onClick={() => navigate(item)}
-            >
-              <span aria-hidden="true">
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              {item}
-            </button>
+          {(
+            [
+              [
+                'WORKSPACE',
+                ['Overview', 'People', 'Payroll', 'Payroll periods'],
+              ],
+              [
+                'REPORTING & COMPLIANCE',
+                [
+                  'Reports',
+                  'ZRA returns',
+                  'Bank batches',
+                  'Compliance',
+                  'Gratuity',
+                ],
+              ],
+              ['MANAGEMENT', ['Setup', 'Team', 'Statutory rules', 'Settings']],
+            ] as [string, Page[]][]
+          ).map(([label, items]) => (
+            <div className="nav-group" key={label}>
+              <p className="nav-label">{label}</p>
+              {items
+                .filter(
+                  (item) =>
+                    !access.data?.permissions ||
+                    access.data.permissions.includes(permissionByPage[item]),
+                )
+                .map((item) => (
+                  <button
+                    key={item}
+                    aria-current={page === item ? 'page' : undefined}
+                    onClick={() => navigate(item)}
+                  >
+                    <Icon name={item} />
+                    <span>{item}</span>
+                  </button>
+                ))}
+            </div>
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <div className="user-avatar">
+            {session.user.displayName.slice(0, 1).toUpperCase()}
+          </div>
           <strong>{session.user.displayName}</strong>
           <small>{session.user.email}</small>
           <button
@@ -152,23 +206,34 @@ export function Workspace({
           </div>
           <span className="badge">ZMW · Zambia</span>
         </header>
-        <p className="development-banner">
-          Bank payments and direct statutory submission are not connected.
-          Finalized payroll records and external filing statuses are tracked
-          separately.
-        </p>
         {error && (
           <p role="alert" className="notice error">
             {error}
           </p>
         )}
-        {company ? (
+        {company &&
+        access.data?.permissions &&
+        !access.data.permissions.includes(permissionByPage[page]) ? (
+          <section className="card">
+            <h2>Access is limited for your role</h2>
+            <p>
+              This page requires additional company permissions. Contact your
+              company owner if you need access.
+            </p>
+            <button onClick={() => navigate('Overview')}>
+              Return to overview
+            </button>
+          </section>
+        ) : company ? (
           <CompanyPage
             key={`${company.id}:${page}`}
             page={page}
             base={`/companies/${company.id}`}
             csrf={session.csrfToken}
             navigate={navigate}
+            {...(access.data?.permissions
+              ? { permissions: access.data.permissions }
+              : {})}
           />
         ) : (
           <p className="empty">
@@ -195,6 +260,8 @@ function CompanyPage({
   navigate,
   ...props
 }: CompanyProps & { page: Page; navigate: (page: Page) => void }) {
+  if (page === 'Team') return <Team {...props} />;
+  if (page === 'Setup') return <Setup {...props} navigate={navigate} />;
   if (page === 'People') return <Employees {...props} />;
   if (page === 'Payroll') return <Payroll {...props} />;
   if (page === 'Reports') return <Reports {...props} />;
@@ -218,7 +285,7 @@ function CompanyPage({
   return <Dashboard {...props} navigate={navigate} />;
 }
 
-function Periods({ base, csrf }: CompanyProps) {
+export function Periods({ base, csrf }: CompanyProps) {
   const [revision, setRevision] = useState(0);
   const { data, error } = useRemote<{
     items: {

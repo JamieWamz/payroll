@@ -102,7 +102,12 @@ describe.runIf(
       napsa: {
         employeeRatePercent: '5',
         employerRatePercent: '5',
-        monthlyCeiling: { status: 'requires-current-dated-notice' },
+        monthlyCeiling: {
+          status: 'dated-reference',
+          confirmedYear: 2026,
+          employeeContributionCap: '1861.80',
+          employerContributionCap: '1861.80',
+        },
       },
       nhima: {
         contributionBase: 'basic_salary',
@@ -110,6 +115,27 @@ describe.runIf(
         employerRatePercent: '1',
       },
     });
+
+    const currentReference = await requireApp().inject({
+      headers: { cookie: primary.cookie },
+      method: 'GET',
+      url: `/api/companies/${primary.companyId}/statutory-configurations/references/zambia-2026`,
+    });
+    expect(currentReference.statusCode).toBe(200);
+    expect(currentReference.headers['cache-control']).toBe('no-store');
+    expect(currentReference.json()).toMatchObject({
+      effectiveFrom: '2026-01-01',
+      effectiveTo: '2026-12-31',
+      parameters: {
+        napsa: { employeeMonthlyCap: '1861.80', employerMonthlyCap: '1861.80' },
+      },
+    });
+    const inaccessibleReference = await requireApp().inject({
+      headers: { cookie: secondary.cookie },
+      method: 'GET',
+      url: `/api/companies/${primary.companyId}/statutory-configurations/references/zambia-2026`,
+    });
+    expect(inaccessibleReference.statusCode).toBe(403);
 
     const crossTenant = await requireApp().inject({
       headers: { cookie: primary.cookie },

@@ -16,6 +16,9 @@ import { authenticationRoutes } from './routes/authentication.js';
 import { companyWorkforceRoutes } from './routes/company-workforce.js';
 import { compensationRoutes } from './routes/compensation.js';
 import { gratuityPolicyRoutes } from './routes/gratuity-policies.js';
+import { teamRoutes } from './routes/team.js';
+import { employeeImportRoutes } from './routes/employee-import.js';
+import { workspaceSetupRoutes } from './routes/workspace-setup.js';
 import { healthRoutes } from './routes/health.js';
 import { payrollPeriodRoutes } from './routes/payroll-periods.js';
 import { payrollRunRoutes } from './routes/payroll-runs.js';
@@ -75,6 +78,17 @@ export async function buildApp({
     },
   );
 
+  await app.register(teamRoutes, { database, environment, prefix: '/api' });
+  await app.register(employeeImportRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
+  await app.register(workspaceSetupRoutes, {
+    database,
+    environment,
+    prefix: '/api',
+  });
   await app.register(healthRoutes, { database, prefix: '/api' });
   await app.register(authenticationRoutes, {
     database,

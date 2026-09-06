@@ -708,7 +708,7 @@ async function findEmployment(
   return records.find((record) => record.id === employmentId);
 }
 
-async function insertEmployee(
+export async function insertEmployee(
   transaction: TenantTransaction,
   employee: Readonly<Employee>,
 ): Promise<void> {
@@ -736,7 +736,7 @@ async function insertEmployee(
   );
 }
 
-async function insertEmployment(
+export async function insertEmployment(
   transaction: TenantTransaction,
   employment: Readonly<Employment>,
 ): Promise<void> {

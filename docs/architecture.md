@@ -9,14 +9,12 @@ a feature, domain model, statutory rule, or security control has been
 implemented.
 
 > [!IMPORTANT]
-> There is no approved 2026 statutory configuration. A deterministic,
-> configuration-driven monthly calculator exists but is not exposed through a
-> payroll route. Payslips and payroll calculation/finalization routes are not implemented.
-> Cookie-session authentication and authorized company, workforce,
-> compensation, and payroll-period routes are implemented. Company, identity,
-> workforce, and statutory-evidence records otherwise remain internal
-> foundations. Payroll-run lifecycle and snapshot persistence exist, but no
-> unverified parameters may be activated.
+> The live workspace now exposes monthly calculation, review/finalization,
+> payslips, reports, audited manual filings, CSV employee imports and team access.
+> A dated 2026 rules preset creates reviewable drafts; company verification is
+> required before use. Historical snapshots remain immutable. The phase notes
+> below describe the original architecture; see [Payroll workspace operations](payroll-workflows.md)
+> for current behavior and integration limitations.
 
 The sequencing and security decisions for Phase 2 are recorded in
 [ADR 0001](decisions/0001-phase-2-domain-boundaries.md). Authentication details

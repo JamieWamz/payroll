@@ -15,33 +15,36 @@ interface Overview {
 export function Dashboard({
   base,
   navigate,
+  permissions,
 }: CompanyProps & { navigate: (page: Page) => void }) {
   const { data, error } = useRemote<Overview>(`${base}/payroll-overview`);
   if (!data) return <Loading error={error} />;
   const { counts, latest, runs } = data;
+  const can = (permission: string) =>
+    !permissions || permissions.includes(permission);
   const tasks: { title: string; description: string; page: Page }[] = [];
-  if (!counts.employees)
+  if (!counts.employees && can('workforce.read'))
     tasks.push({
       title: 'Add your employees',
       description:
         'Create employee records, employment dates and monthly salaries.',
       page: 'People',
     });
-  if (counts.missingSalaries)
+  if (counts.missingSalaries && can('workforce.read'))
     tasks.push({
       title: `${counts.missingSalaries} employees need salary review`,
       description:
         'An active monthly salary is missing as of today. Review employment and compensation.',
       page: 'People',
     });
-  if (!counts.verifiedRules)
+  if (!counts.verifiedRules && can('statutory-config.read'))
     tasks.push({
       title: 'Verify statutory rules',
       description:
         'No verified configuration covers today. Review PAYE, NAPSA and NHIMA source evidence.',
       page: 'Statutory rules',
     });
-  if (!counts.periods)
+  if (!counts.periods && can('payroll.calculate'))
     tasks.push({
       title: 'Set your first pay period',
       description: 'Choose the month and date employees will be paid.',
@@ -74,11 +77,27 @@ export function Dashboard({
           }).format(new Date())}
         </p>
         <button onClick={() => navigate('Payroll')}>
-          {latest && latest.status !== 'finalized'
-            ? 'Review payroll'
-            : 'Prepare payroll'}
+          {!can('payroll.calculate')
+            ? 'View payroll'
+            : latest && latest.status !== 'finalized'
+              ? 'Review payroll'
+              : 'Prepare payroll'}
         </button>
       </div>
+      {can('company.update') && (
+        <div className="setup-prompt">
+          <div>
+            <strong>Everything in place for pay day?</strong>
+            <p>
+              Review your business details, people, schedule and statutory
+              rules.
+            </p>
+          </div>
+          <button className="secondary" onClick={() => navigate('Setup')}>
+            Open setup guide →
+          </button>
+        </div>
+      )}
       <div className="dashboard-grid">
         <section className="payroll-spotlight">
           <div className="section-heading">
@@ -135,10 +154,10 @@ export function Dashboard({
             ))
           ) : (
             <div className="empty">
-              <strong>Preparation records are in place.</strong>
+              <strong>No preparation actions assigned in this view.</strong>
               <p>
-                Open payroll to validate employee inputs and calculate the next
-                run.
+                Review payroll records or contact your company owner about
+                setup.
               </p>
             </div>
           )}
@@ -148,9 +167,11 @@ export function Dashboard({
         <div>
           <span>Active employees</span>
           <strong>{counts.employees}</strong>
-          <button className="text-button" onClick={() => navigate('People')}>
-            Employee directory →
-          </button>
+          {can('workforce.read') && (
+            <button className="text-button" onClick={() => navigate('People')}>
+              Employee directory →
+            </button>
+          )}
         </div>
         <div>
           <span>Gross payroll</span>
@@ -175,12 +196,14 @@ export function Dashboard({
           <strong>
             {counts.verifiedRules ? 'Verified' : 'Review required'}
           </strong>
-          <button
-            className="text-button"
-            onClick={() => navigate('Statutory rules')}
-          >
-            View source evidence →
-          </button>
+          {can('statutory-config.read') && (
+            <button
+              className="text-button"
+              onClick={() => navigate('Statutory rules')}
+            >
+              View source evidence →
+            </button>
+          )}
         </div>
       </div>
       <section className="card">
@@ -206,9 +229,11 @@ export function Dashboard({
           <h2>Keep the next step close</h2>
           <p>Common tasks for your payroll workspace.</p>
         </div>
-        <button className="secondary" onClick={() => navigate('People')}>
-          Manage employees
-        </button>
+        {can('workforce.read') && (
+          <button className="secondary" onClick={() => navigate('People')}>
+            Manage employees
+          </button>
+        )}
         <button className="secondary" onClick={() => navigate('Reports')}>
           Download reports
         </button>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { zambia2026MonthlyReference } from '../src/modules/payroll/calculation/zambia-2026-reference.js';
 
 import type {
   CalculationVersion,
@@ -99,6 +100,34 @@ describe('configurable Zambian monthly payroll calculator', () => {
       '1708.20',
     );
   });
+
+  it.each([
+    ['34164.00', '1708.20'],
+    ['37235.80', '1861.79'],
+    ['37236.00', '1861.80'],
+    ['50000.00', '1861.80'],
+  ])(
+    'applies the dated 2026 cap to %s without changing percentage rates',
+    (salary, expectedNapsa) => {
+      const compensation = [earning('BASE_SALARY', salary)];
+      const previous = zambianMonthlyPayrollCalculator.calculate(
+        createInput({ compensation }),
+      );
+      const current = zambianMonthlyPayrollCalculator.calculate(
+        createInput({
+          compensation,
+          parameters: zambia2026MonthlyReference.parameters,
+        }),
+      );
+      expect(serializeMoney(current.napsa).amount).toBe(expectedNapsa);
+      expect(
+        serializeMoney(current.employerContributions[0]!.amount).amount,
+      ).toBe(expectedNapsa);
+      expect(current.paye).toEqual(previous.paye);
+      expect(current.nhima).toEqual(previous.nhima);
+      expect(serializeMoney(previous.napsa).amount).toBe('1708.20');
+    },
+  );
 
   it('uses operator-versioned percentages without changing the engine', () => {
     const adjusted = {

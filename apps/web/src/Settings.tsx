@@ -101,9 +101,31 @@ interface Rule extends Configuration {
   }[];
   verification: { verifiedAt: string; verifiedByMembershipId: string } | null;
 }
+interface MonthlyReference {
+  version: string;
+  effectiveFrom: string;
+  effectiveTo: string;
+  reviewedOn: string;
+  notes: string;
+  parameters: {
+    paye: { bands: { upTo: string | null; ratePercent: string }[] };
+    napsa: ContributionReference;
+    nhima: ContributionReference;
+  };
+  sources: Rule['sources'];
+}
+interface ContributionReference {
+  employeeRatePercent: string;
+  employerRatePercent: string;
+  employeeMonthlyCap: string | null;
+  employerMonthlyCap: string | null;
+}
 export function StatutoryRules({ base, csrf }: CompanyProps) {
   const [revision, setRevision] = useState(0);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<'manual' | '2026' | null>(null);
+  const reference = useRemote<MonthlyReference>(
+    `${base}/statutory-configurations/references/zambia-2026`,
+  );
   const [selected, setSelected] = useState('');
   const { data, error } = useRemote<{ items: Rule[] }>(
     `${base}/statutory-configurations?limit=100`,
@@ -116,10 +138,45 @@ export function StatutoryRules({ base, csrf }: CompanyProps) {
           Versioned PAYE, NAPSA and NHIMA rules, with source evidence and
           recorded reviewer verification.
         </p>
-        <button onClick={() => setCreating(!creating)}>
+        <button onClick={() => setCreating(creating ? null : 'manual')}>
           {creating ? 'Close rule form' : 'Add statutory rules'}
         </button>
       </div>
+      {reference.data && (
+        <section className="card statutory-reference">
+          <div className="page-intro">
+            <div>
+              <p className="eyebrow">January–December 2026</p>
+              <h2>Monthly statutory rates</h2>
+            </div>
+            <button onClick={() => setCreating('2026')}>Use 2026 rates</button>
+          </div>
+          <DataTable
+            columns={[
+              'Authority',
+              'Employee',
+              'Employer',
+              'Monthly basis / limit',
+            ]}
+            rows={[
+              [
+                'ZRA · PAYE',
+                '0% / 20% / 30% / 37%',
+                'Withheld from employee',
+                'K5,100 / K7,100 / K9,200 cumulative bands',
+              ],
+              ['NAPSA', '5%', '5%', 'Gross earnings · K1,861.80 cap each'],
+              ['NHIMA', '1%', '1%', 'Basic salary · no monetary cap'],
+            ]}
+          />
+          <p className="muted">{reference.data.notes}</p>
+          <p className="muted">
+            Creates a reviewable draft for your company. Existing payroll and
+            verified versions retain their original rules.
+          </p>
+        </section>
+      )}
+      {reference.error && <Loading error={reference.error} />}
       <p className="notice">
         Use authoritative rules applicable to the payroll dates. No current-year
         rates are activated automatically. Verification records your review; it
@@ -127,10 +184,14 @@ export function StatutoryRules({ base, csrf }: CompanyProps) {
       </p>
       {creating && (
         <CreateRules
+          key={creating}
           base={base}
           csrf={csrf}
+          preset={
+            creating === '2026' ? (reference.data ?? undefined) : undefined
+          }
           done={() => {
-            setCreating(false);
+            setCreating(null);
             setRevision((v) => v + 1);
           }}
         />
@@ -180,13 +241,18 @@ function CreateRules({
   base,
   csrf,
   done,
-}: CompanyProps & { done: () => void }) {
-  const [bands, setBands] = useState([
-    { upTo: '', ratePercent: '' },
-    { upTo: '', ratePercent: '' },
-    { upTo: '', ratePercent: '' },
-    { upTo: '', ratePercent: '' },
-  ]);
+  preset,
+}: CompanyProps & { done: () => void; preset?: MonthlyReference | undefined }) {
+  const [bands, setBands] = useState(
+    preset
+      ? preset.parameters.paye.bands.map((b) => ({ ...b, upTo: b.upTo ?? '' }))
+      : [
+          { upTo: '', ratePercent: '' },
+          { upTo: '', ratePercent: '' },
+          { upTo: '', ratePercent: '' },
+          { upTo: '', ratePercent: '' },
+        ],
+  );
   const [treatments, setTreatments] = useState([
     {
       code: 'BASE_SALARY',
@@ -195,6 +261,28 @@ function CreateRules({
       nhima: 'included',
     },
   ]);
+  const defaults: Record<string, string> = preset
+    ? {
+        version: preset.version,
+        effectiveFrom: preset.effectiveFrom,
+        effectiveTo: preset.effectiveTo,
+        accessedOn: preset.reviewedOn,
+        ...Object.fromEntries(
+          (['napsa', 'nhima'] as const).flatMap((a) => [
+            [`${a}EmployeeRate`, preset.parameters[a].employeeRatePercent],
+            [`${a}EmployerRate`, preset.parameters[a].employerRatePercent],
+            [`${a}EmployeeCap`, preset.parameters[a].employeeMonthlyCap ?? ''],
+            [`${a}EmployerCap`, preset.parameters[a].employerMonthlyCap ?? ''],
+          ]),
+        ),
+        ...Object.fromEntries(
+          preset.sources.flatMap((s) => [
+            [`${s.authority}SourceTitle`, s.title],
+            [`${s.authority}SourceUri`, s.uri],
+          ]),
+        ),
+      }
+    : {};
   const fields = [
     {
       name: 'version',
@@ -234,7 +322,7 @@ function CreateRules({
       { name: `${a}SourceTitle`, label: `${a.toUpperCase()} source title` },
       {
         name: `${a}SourceUri`,
-        label: `${a.toUpperCase()} official source URL`,
+        label: `${a.toUpperCase()} evidence URL`,
         type: 'url',
       },
     ]),
@@ -243,7 +331,10 @@ function CreateRules({
     <EntryForm
       title="Create a sourced rule version"
       submit="Save draft rules"
-      fields={fields}
+      fields={fields.map((f) => ({
+        ...f,
+        defaultValue: defaults[f.name] ?? '',
+      }))}
       action={async (values) => {
         const parameters = {
           schemaVersion: 'ZAMBIA-MONTHLY-1',

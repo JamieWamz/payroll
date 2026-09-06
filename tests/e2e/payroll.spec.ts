@@ -15,21 +15,47 @@ test('register, manage employee, calculate, finalize, export, record filing and 
   const password = 'Correct horse battery staple 2026!';
   let companyId = '';
   let userId = '';
+  const invitedUserIds: string[] = [];
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
     await page.goto('/');
-    await page
-      .getByRole('button', { name: 'New company? Create a workspace' })
-      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Welcome back.' }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath('login-desktop.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath('login-mobile.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.getByRole('button', { name: 'Create a workspace' }).click();
     await page.getByLabel('Your name').fill('Browser Test Owner');
-    await page.getByLabel('Company name').fill('Payroll Browser Test');
-    await page.getByLabel('Company code').fill(marker);
     await page.getByLabel('Email address').fill(email);
     await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Show password' }).click();
+    await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute(
+      'type',
+      'text',
+    );
+    await page.getByRole('button', { name: 'Hide password' }).click();
+    await page
+      .getByRole('button', { name: 'Continue to business details' })
+      .click();
+    await page.getByLabel('Company name').fill('Payroll Browser Test');
+    await page.getByLabel('Company code').fill(marker);
     await page.getByRole('button', { name: 'Create company account' }).click();
     await expect(
-      page.getByRole('heading', { name: 'Overview', exact: true }),
+      page.getByRole('heading', { name: 'Setup', exact: true }),
     ).toBeVisible();
     const session = await page.evaluate(async () => {
       const response = await fetch('/api/auth/session');
@@ -38,6 +64,13 @@ test('register, manage employee, calculate, finalize, export, record filing and 
         user: { id: string };
         csrfToken: string;
       }>;
+    });
+    await expect(
+      page.getByRole('list', { name: 'Company setup steps' }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath('setup-desktop.png'),
+      fullPage: true,
     });
     console.info('Browser: registration complete');
     companyId = session.companies[0]!.id;
@@ -52,6 +85,123 @@ test('register, manage employee, calculate, finalize, export, record filing and 
         page.getByRole('heading', { name, exact: true }),
       ).toBeVisible();
     };
+    await nav('Team');
+    await page.getByRole('button', { name: 'Invite team member' }).click();
+    await page
+      .getByLabel('Team member email')
+      .fill(`${marker}-invite@example.com`);
+    await page.getByLabel('Access role').selectOption('report-reader');
+    await page.getByRole('button', { name: 'Create invitation link' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Invitation link created' }),
+    ).toBeVisible();
+    await expect(
+      page.getByLabel('Invitation link', { exact: true }),
+    ).toHaveValue(/#invite=/);
+    await page.getByRole('button', { name: 'Revoke invitation' }).click();
+    await expect(
+      page.getByRole('cell', { name: 'revoked', exact: true }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Invite team member' }).click();
+    await page
+      .getByLabel('Team member email')
+      .fill(`${marker}-reader@example.com`);
+    await page.getByLabel('Access role').selectOption('report-reader');
+    await page.getByRole('button', { name: 'Create invitation link' }).click();
+    const invitationUrl = await page
+      .getByLabel('Invitation link', { exact: true })
+      .inputValue();
+    const readerContext = await page.context().browser()!.newContext();
+    try {
+      const readerPage = await readerContext.newPage();
+      readerPage.on('pageerror', (e) => errors.push(e.message));
+      await readerPage.goto(invitationUrl);
+      await expect(
+        readerPage.getByRole('heading', { name: 'Join your company.' }),
+      ).toBeVisible();
+      await readerPage.getByLabel('Your name').fill('Invited Reader');
+      await readerPage.getByLabel('Password', { exact: true }).fill(password);
+      await readerPage
+        .getByRole('button', { name: 'Accept invitation & sign in' })
+        .click();
+      await expect(
+        readerPage.getByRole('heading', { name: 'Overview', exact: true }),
+      ).toBeVisible();
+      const joined = await readerPage.evaluate(
+        async () =>
+          (await fetch('/api/auth/session')).json() as Promise<{
+            user: { id: string };
+          }>,
+      );
+      invitedUserIds.push(joined.user.id);
+      await expect(
+        readerPage
+          .getByRole('navigation', { name: 'Main navigation' })
+          .getByRole('button', { name: 'Team', exact: true }),
+      ).toHaveCount(0);
+      await readerPage.screenshot({
+        path: testInfo.outputPath('reader-workspace.png'),
+        fullPage: true,
+      });
+    } finally {
+      await readerContext.close();
+    }
+
+    await nav('People');
+    await page
+      .getByRole('button', { name: 'Import employees', exact: true })
+      .click();
+    await page.getByLabel('Choose employee CSV').setInputFiles({
+      name: 'employees.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(
+        'employeeNumber,givenName,familyName,positionTitle,startsOn,salary\nIMPORT-001,Import,Example,Clerk,2025-01-01,8000.00',
+      ),
+    });
+    await page.getByRole('button', { name: 'Validate & preview' }).click();
+    await expect(
+      page.getByRole('cell', { name: 'IMPORT-001', exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole('checkbox', { name: /I reviewed these employees/ })
+      .check();
+    await page.getByRole('button', { name: 'Import 1 employees' }).click();
+    await expect(page.getByRole('status')).toContainText(
+      '1 employees and their monthly salaries imported',
+    );
+    await nav('Statutory rules');
+    await page.getByRole('button', { name: 'Use 2026 rates' }).click();
+    await expect(
+      page.getByLabel('NAPSA employee monthly cap (ZMW)', { exact: true }),
+    ).toHaveValue('1861.80');
+    await expect(
+      page.getByLabel('NHIMA employee rate (%)', { exact: true }),
+    ).toHaveValue('1');
+    await expect(
+      page.getByLabel('Effective to (optional)', { exact: true }),
+    ).toHaveValue('2026-12-31');
+    await expect(
+      page.getByLabel('Band 4 rate (%)', { exact: true }),
+    ).toHaveValue('37');
+    await page.getByRole('button', { name: 'Save draft rules' }).click();
+    await expect(
+      page.getByRole('row').filter({ hasText: 'ZM-2026-MONTHLY-1' }),
+    ).toContainText('draft');
+    await page.getByRole('button', { name: 'Review evidence' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Verify statutory rules' }),
+    ).toBeDisabled();
+    await page
+      .getByRole('checkbox', { name: /I reviewed the official sources/ })
+      .check();
+    await page.getByRole('button', { name: 'Verify statutory rules' }).click();
+    await expect(
+      page.getByRole('row').filter({ hasText: 'ZM-2026-MONTHLY-1' }),
+    ).toContainText('verified');
+    await page.screenshot({
+      path: testInfo.outputPath('statutory-rules-desktop.png'),
+      fullPage: true,
+    });
     // Historical rules are explicitly synthetic test fixtures, isolated in this company.
     await page.evaluate(
       async ({ companyId, csrf }) => {
@@ -336,11 +486,11 @@ test('register, manage employee, calculate, finalize, export, record filing and 
     ).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
-    if (companyId) await cleanUpCompany(companyId, userId);
+    if (companyId) await cleanUpCompany(companyId, [userId, ...invitedUserIds]);
   }
 });
 
-async function cleanUpCompany(companyId: string, userId: string) {
+async function cleanUpCompany(companyId: string, userIds: string[]) {
   const pool = new Pool({
     connectionString: process.env['TEST_DATABASE_MIGRATION_URL'],
   });
@@ -348,6 +498,7 @@ async function cleanUpCompany(companyId: string, userId: string) {
   try {
     await client.query('BEGIN');
     for (const table of [
+      'company_invitations',
       'payroll_filing_events',
       'payroll_run_components',
       'payroll_run_employees',
@@ -371,15 +522,19 @@ async function cleanUpCompany(companyId: string, userId: string) {
         companyId,
       ]);
     await client.query(
-      'DELETE FROM app.audit_events WHERE actor_user_account_id=$1',
-      [userId],
+      'DELETE FROM app.audit_events WHERE actor_user_account_id=ANY($1::uuid[])',
+      [userIds],
     );
     for (const table of ['sessions', 'password_credentials'])
-      await client.query(`DELETE FROM app.${table} WHERE user_account_id=$1`, [
-        userId,
-      ]);
+      await client.query(
+        `DELETE FROM app.${table} WHERE user_account_id=ANY($1::uuid[])`,
+        [userIds],
+      );
     await client.query('DELETE FROM app.companies WHERE id=$1', [companyId]);
-    await client.query('DELETE FROM app.user_accounts WHERE id=$1', [userId]);
+    await client.query(
+      'DELETE FROM app.user_accounts WHERE id=ANY($1::uuid[])',
+      [userIds],
+    );
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

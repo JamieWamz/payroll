@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ZamPayroll — Login concept</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f5f3ef;
+        color: #172231;
+        font-family: Arial, sans-serif;
+      }
+      .shell {
+        min-height: 100vh;
+        padding: 30px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      .access {
+        padding: 20px 44px;
+        display: flex;
+        flex-direction: column;
+      }
+      .brand {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.8px;
+      }
+      .mark {
+        background: #172b43;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+      }
+      .form {
+        width: 100%;
+        max-width: 390px;
+        margin: auto;
+        padding: 56px 0;
+      }
+      .kicker {
+        font-size: 11px;
+        letter-spacing: 2px;
+        font-weight: 700;
+        color: #856447;
+      }
+      h1 {
+        font-size: 38px;
+        letter-spacing: -1.6px;
+        margin: 12px 0;
+      }
+      p {
+        color: #657080;
+        font-size: 15px;
+        line-height: 1.7;
+      }
+      label {
+        font-size: 13px;
+        display: block;
+        font-weight: 600;
+        margin: 26px 0 9px;
+      }
+      input {
+        width: 100%;
+        border: 1px solid #d4d7db;
+        background: white;
+        border-radius: 7px;
+        padding: 15px;
+        font: inherit;
+      }
+      button {
+        border: 0;
+        border-radius: 7px;
+        background: #172b43;
+        color: white;
+        padding: 16px;
+        width: 100%;
+        font-size: 14px;
+        font-weight: 600;
+        margin-top: 26px;
+      }
+      .new {
+        border-top: 1px solid #dddeda;
+        margin-top: 30px;
+        padding-top: 26px;
+        font-size: 13px;
+        text-align: center;
+      }
+      .foot {
+        font-size: 11px;
+        color: #7c8490;
+      }
+      .story {
+        background: #172b43;
+        color: white;
+        border-radius: 16px;
+        padding: 52px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 740px;
+      }
+      .story .kicker {
+        color: #d9b99b;
+      }
+      .story h2 {
+        font-size: 44px;
+        line-height: 1.15;
+        font-weight: 500;
+        letter-spacing: -1.6px;
+        margin: 28px 0 22px;
+      }
+      .story h2 em {
+        color: #dfb28e;
+        font-style: normal;
+      }
+      .story p {
+        color: #b8c2cf;
+        max-width: 340px;
+      }
+      .ledger {
+        border: 1px solid #4d5a6c;
+        border-radius: 10px;
+        padding: 26px;
+        margin: 38px 0;
+        background: #1c3048;
+      }
+      .ledger header {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #4d5a6c;
+        padding-bottom: 20px;
+        font-size: 12px;
+      }
+      .tag {
+        color: #dfb28e;
+      }
+      .step {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        border-bottom: 1px solid #3c4f64;
+        padding: 19px 0;
+        font-size: 14px;
+      }
+      .step:last-child {
+        border: 0;
+        padding-bottom: 0;
+      }
+      .number {
+        font-size: 11px;
+        color: #dfb28e;
+      }
+      .step span:last-child {
+        margin-left: auto;
+        color: #acb9c9;
+        font-size: 12px;
+      }
+      .story footer {
+        display: flex;
+        gap: 25px;
+        color: #c3cbd5;
+        font-size: 11px;
+        letter-spacing: 0.6px;
+      }
+      .note {
+        font-size: 10px;
+        color: #acb9c9;
+        margin-top: 18px;
+      }
+      @media (max-width: 800px) {
+        .shell {
+          grid-template-columns: 1fr;
+          padding: 12px;
+        }
+        .access {
+          padding: 20px;
+        }
+        .story {
+          min-height: initial;
+          padding: 32px;
+        }
+        .story h2 {
+          font-size: 32px;
+        }
+        .form {
+          padding: 44px 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="access">
+        <div class="brand"><span class="mark">Z</span>ZamPayroll</div>
+        <div class="form">
+          <div class="kicker">YOUR PAYROLL WORKSPACE</div>
+          <h1>Welcome back.</h1>
+          <p>Sign in to take care of your people and payroll.</p>
+          <label for="email">Email address</label
+          ><input id="email" type="email" placeholder="you@company.com" /><label
+            for="password"
+            >Password</label
+          ><input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+          /><button type="button">Sign in →</button>
+          <div class="new">New to ZamPayroll? <b>Create a workspace →</b></div>
+        </div>
+        <footer class="foot">Zambia · ZMW / Secure company access</footer>
+      </section>
+      <section class="story">
+        <div>
+          <div class="kicker">MADE FOR WORKING LIFE IN ZAMBIA</div>
+          <h2>Good payroll.<br /><em>Peace of mind.</em></h2>
+          <p>
+            From your first employee to your next pay day. Keep every record,
+            review and payslip in one place.
+          </p>
+        </div>
+        <div class="ledger">
+          <header>
+            <strong>A clear path to pay day</strong
+            ><span class="tag">MONTHLY PAYROLL</span>
+          </header>
+          <div class="step">
+            <span class="number">01</span
+            ><strong>Bring your people together</strong><span>People</span>
+          </div>
+          <div class="step">
+            <span class="number">02</span><strong>Review the details</strong
+            ><span>Payroll</span>
+          </div>
+          <div class="step">
+            <span class="number">03</span><strong>Keep a clear record</strong
+            ><span>Reports</span>
+          </div>
+        </div>
+        <footer>
+          <span>PAYE</span><span>NAPSA</span><span>NHIMA</span
+          ><span>PAYSLIPS</span>
+        </footer>
+        <div class="note">
+          Design concept · Original layout inspired by Dribbble references. No
+          customer data.
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,13 +1,27 @@
 import { useEffect, useState } from 'react';
 import { message, request, RequestError, type Session } from './api';
-import { EntryForm } from './components';
+import { JoinCompany } from './JoinCompany';
+import { AuthScreen } from './AuthScreen';
 import { Workspace } from './Workspace';
 import './styles.css';
+import './product.css';
 export function App() {
+  const [inviteToken, setInviteToken] = useState(
+    () => /^#invite=([A-Za-z0-9_-]{43})$/.exec(window.location.hash)?.[1] ?? '',
+  );
+  useEffect(() => {
+    const readInvitation = () => {
+      const token = /^#invite=([A-Za-z0-9_-]{43})$/.exec(
+        window.location.hash,
+      )?.[1];
+      if (token) setInviteToken(token);
+    };
+    window.addEventListener('hashchange', readInvitation);
+    return () => window.removeEventListener('hashchange', readInvitation);
+  }, []);
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState('');
-  const [register, setRegister] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     void request<Session>('/auth/session', { signal: controller.signal })
@@ -34,6 +48,22 @@ export function App() {
       window.removeEventListener('payroll-session-expired', expired);
     };
   }, []);
+  if (inviteToken && !checking)
+    return (
+      <JoinCompany
+        token={inviteToken}
+        done={(value) => {
+          window.history.replaceState(null, '', '#Overview');
+          setInviteToken('');
+          setSession(value);
+          setError('');
+        }}
+        cancel={() => {
+          window.history.replaceState(null, '', '/');
+          setInviteToken('');
+        }}
+      />
+    );
   if (checking)
     return (
       <main className="boot" role="status">
@@ -43,91 +73,12 @@ export function App() {
   if (session)
     return <Workspace session={session} onLogout={() => setSession(null)} />;
   return (
-    <main className="auth-shell">
-      <section className="auth-story">
-        <div className="brand">
-          <span className="brand-mark">Z</span>ZamPayroll
-        </div>
-        <div>
-          <p className="eyebrow">THE PAYROLL WORKSPACE · ZAMBIA</p>
-          <h1>
-            Your people.
-            <br />
-            Your policies.
-            <br />
-            <span>Every detail accounted for.</span>
-          </h1>
-          <p>
-            One focused workspace for employee records, payroll preparation and
-            evidence-backed company policies.
-          </p>
-        </div>
-        <p className="auth-footnote">
-          Development build · Not approved for live payroll
-        </p>
-      </section>
-      <section className="auth-panel">
-        <p className="eyebrow">WELCOME TO ZAMPAYROLL</p>
-        {error && (
-          <p role="alert" className="notice error">
-            {error}
-          </p>
-        )}
-        <EntryForm
-          key={String(register)}
-          title={
-            register ? 'Create your workspace' : 'Sign in to your workspace'
-          }
-          submit={register ? 'Create company account' : 'Sign in'}
-          fields={[
-            ...(register
-              ? [
-                  { name: 'displayName', label: 'Your name' },
-                  { name: 'companyName', label: 'Company name' },
-                  {
-                    name: 'companyCode',
-                    label: 'Company code',
-                    hint: 'A unique short code, such as acme-zm.',
-                  },
-                ]
-              : []),
-            {
-              name: 'email',
-              label: 'Email address',
-              type: 'email',
-              maxLength: 320,
-            },
-            {
-              name: 'password',
-              label: 'Password',
-              type: 'password',
-              maxLength: 256,
-              ...(register
-                ? { hint: 'Use a strong passphrase of at least 15 characters.' }
-                : {}),
-            },
-          ]}
-          action={async (values) => {
-            const value = await request<Session>(
-              register ? '/auth/register' : '/auth/login',
-              { body: values },
-            );
-            setError('');
-            setRegister(false);
-            setSession(value);
-            return '';
-          }}
-        />
-        <button className="text-button" onClick={() => setRegister(!register)}>
-          {register
-            ? 'Already have an account? Sign in'
-            : 'New company? Create a workspace'}
-        </button>
-        <p className="muted">
-          Session-protected access. Company data stays within your authorized
-          workspace.
-        </p>
-      </section>
-    </main>
+    <AuthScreen
+      error={error}
+      onAuthenticated={(value) => {
+        setError('');
+        setSession(value);
+      }}
+    />
   );
 }

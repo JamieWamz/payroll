@@ -279,6 +279,173 @@ export const authenticationRoutes: FastifyPluginAsync<
     });
   });
 
+  app.post(
+    '/auth/invitation',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const { token } = parseBody(
+        z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict(),
+        request.body,
+      );
+      const invitation = await options.database.withSystemTransaction(
+        async (tx) =>
+          (
+            await tx.query<{
+              companyId: string;
+              companyName: string;
+              email: string;
+              role: string;
+            }>(
+              'SELECT company_id AS "companyId",company_name AS "companyName",email,role_code AS role FROM app.inspect_company_invitation($1)',
+              [digestSecurityToken(parseOpaqueSecurityToken(token))],
+            )
+          ).rows[0],
+      );
+      if (!invitation)
+        throw new ApiError(
+          404,
+          'This invitation is invalid, expired or revoked. Ask the company owner for a new link.',
+        );
+      return reply.header('cache-control', 'no-store').send(invitation);
+    },
+  );
+  app.post(
+    '/auth/join-company',
+    { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const body = parseBody(
+        z
+          .object({
+            token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+            displayName: z.string().min(1).max(120),
+            password: z.string().min(1).max(256),
+          })
+          .strict(),
+        request.body,
+      );
+      const digest = digestSecurityToken(parseOpaqueSecurityToken(body.token));
+      let authenticated;
+      try {
+        authenticated = await options.database.withSystemTransaction(
+          async (tx) => {
+            const invitation = (
+              await tx.query<{ email: string; companyId: string }>(
+                'SELECT email, company_id AS "companyId" FROM app.inspect_company_invitation($1)',
+                [digest],
+              )
+            ).rows[0];
+            if (!invitation)
+              throw new ApiError(
+                404,
+                'This invitation is invalid, expired or revoked. Ask the company owner for a new link.',
+              );
+            const existing = await findAuthenticationRecord(
+              tx,
+              invitation.email,
+            );
+            if (existing) {
+              const matches = await verifyPassword(
+                parsePasswordHash(existing.passwordHash),
+                body.password,
+              );
+              const locked =
+                existing.lockedUntil !== null &&
+                existing.lockedUntil.getTime() > Date.now();
+              if (!matches || locked || existing.accountStatus !== 'active') {
+                if (!matches && !locked)
+                  await tx.query(
+                    'SELECT app.record_authentication_failure($1)',
+                    [existing.userAccountId],
+                  );
+                await appendDeniedLoginAudit(
+                  tx,
+                  existing.userAccountId,
+                  request.id,
+                );
+                return undefined;
+              }
+              await tx.query('SELECT app.record_authentication_success($1)', [
+                existing.userAccountId,
+              ]);
+            }
+            const user = createUserAccount({
+              id: existing?.userAccountId ?? randomUUID(),
+              email: invitation.email,
+              displayName: existing?.displayName ?? body.displayName,
+            });
+            const passwordHash = existing
+              ? null
+              : await hashPassword(
+                  await validateNewPassword(body.password, passwordBlocklist),
+                );
+            const session = createNewSession(options.environment);
+            if (existing)
+              await persistSession(tx, user.id, session, request.id);
+            await tx.query(
+              'SELECT app.accept_company_invitation($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+              [
+                digest,
+                user.id,
+                user.displayName,
+                passwordHash,
+                existing ? session.secrets.sessionTokenDigest : null,
+                randomUUID(),
+                randomUUID(),
+                randomUUID(),
+                request.id,
+              ],
+            );
+            if (!existing)
+              await persistSession(tx, user.id, session, request.id);
+            return {
+              user,
+              session,
+              memberships: (await findMemberships(tx, user.id)).toSorted(
+                (a, b) =>
+                  Number(b.companyId === invitation.companyId) -
+                  Number(a.companyId === invitation.companyId),
+              ),
+            };
+          },
+        );
+      } catch (error) {
+        if (isPostgresError(error, '23505'))
+          throw new ApiError(
+            409,
+            'This account already belongs to the company or changed during acceptance. Ask the owner to review Team access.',
+          );
+        if (isPostgresError(error, '22023'))
+          throw new ApiError(
+            409,
+            'Invitation changed or can no longer be accepted. Ask the owner for a new invitation.',
+          );
+        throw error;
+      }
+      if (!authenticated)
+        throw new ApiError(
+          401,
+          'The account credentials could not be verified. If you already have an account, use its existing password.',
+        );
+      setAuthenticationCookies(
+        reply,
+        options.environment,
+        authenticated.session,
+      );
+      return reply
+        .header('cache-control', 'no-store')
+        .status(201)
+        .send({
+          companies: serializeMemberships(authenticated.memberships),
+          csrfToken: authenticated.session.secrets.csrfToken,
+          user: {
+            id: authenticated.user.id,
+            displayName: authenticated.user.displayName,
+            email: authenticated.user.email,
+          },
+        });
+    },
+  );
+
   app.post('/auth/logout', async (request, reply) => {
     const token = request.cookies[sessionCookieName];
     const csrfCookie = request.cookies[csrfCookieName];

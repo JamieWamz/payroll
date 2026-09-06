@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { request, download } from './api';
 import { ActionButton, DataTable, EntryForm, Loading } from './components';
+import { EmployeeImport } from './EmployeeImport';
 import { useRemote } from './useRemote';
 import type { CompanyProps } from './Workspace';
 import {
@@ -20,6 +21,8 @@ export function Employees({ base, csrf }: CompanyProps) {
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState('');
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState(0);
   const { data, error } = useRemote<{ items: Employee[] }>(
     `${base}/employees?limit=25&offset=${offset}&search=${encodeURIComponent(search)}&sort=${sort}${status ? `&status=${status}` : ''}`,
     revision,
@@ -43,10 +46,43 @@ export function Employees({ base, csrf }: CompanyProps) {
         <p>
           Employee records, employment history and payroll details in one place.
         </p>
-        <button onClick={() => setAdding(!adding)}>
-          {adding ? 'Close employee form' : 'Add employee'}
-        </button>
+        <div className="import-actions">
+          <button
+            className="secondary"
+            onClick={() => {
+              setImporting(!importing);
+              setAdding(false);
+            }}
+          >
+            {importing ? 'Close import' : 'Import employees'}
+          </button>
+          <button
+            onClick={() => {
+              setAdding(!adding);
+              setImporting(false);
+            }}
+          >
+            {adding ? 'Close employee form' : 'Add employee'}
+          </button>
+        </div>
       </div>
+      {imported > 0 && (
+        <p className="notice success" role="status">
+          {imported} employees and their monthly salaries imported. Open each
+          profile to review tax and banking details.
+        </p>
+      )}
+      {importing && (
+        <EmployeeImport
+          base={base}
+          csrf={csrf}
+          done={(count) => {
+            setImported(count);
+            setImporting(false);
+            setRevision((v) => v + 1);
+          }}
+        />
+      )}
       {adding && (
         <EntryForm
           title="Add an employee"

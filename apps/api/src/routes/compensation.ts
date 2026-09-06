@@ -498,7 +498,7 @@ async function findComponents(
   ).rows;
 }
 
-async function insertSalary(
+export async function insertSalary(
   transaction: TenantTransaction,
   salary: Readonly<Salary>,
 ) {

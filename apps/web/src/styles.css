@@ -7,8 +7,8 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  color: #24362f;
-  background: #f5f6f3;
+  color: #1c293a;
+  background: #f5f6f8;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   line-height: 1.55;
@@ -29,13 +29,13 @@ button {
   border: 1px solid transparent;
   border-radius: 7px;
   padding: 11px 18px;
-  background: #24604b;
+  background: #203b59;
   color: white;
   font-weight: 600;
   cursor: pointer;
 }
 button:hover {
-  background: #194b39;
+  background: #152b43;
 }
 button:disabled {
   opacity: 0.55;
@@ -53,7 +53,7 @@ select {
   min-height: 44px;
   padding: 10px 12px;
   background: white;
-  color: #24362f;
+  color: #1c293a;
   border: 1px solid #b7c5d3;
   border-radius: 6px;
   margin-top: 7px;
@@ -66,7 +66,7 @@ label {
 small {
   display: block;
   font-weight: 400;
-  color: #5b6962;
+  color: #657183;
   line-height: 1.5;
   margin-top: 6px;
 }
@@ -97,10 +97,10 @@ h3 {
   font-size: 0.95rem;
 }
 p {
-  color: #5b6962;
+  color: #657183;
 }
 .eyebrow {
-  color: #5b6962;
+  color: #657183;
   font-size: 0.7rem;
   letter-spacing: 0.14em;
   font-weight: 700;
@@ -113,14 +113,14 @@ p {
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.03em;
-  color: #234735;
+  color: #1b3049;
 }
 .brand-mark {
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
-  background: #285d45;
+  background: #203b59;
   color: #fff;
   border-radius: 9px;
   font-size: 1.3rem;
@@ -131,9 +131,9 @@ p {
   min-height: 100vh;
 }
 .sidebar {
-  background: #fcfdfb;
-  border-right: 1px solid #dce3dc;
-  color: #263d31;
+  background: #ffffff;
+  border-right: 1px solid #e0e4e9;
+  color: #28374a;
   padding: 32px 20px 22px;
   display: flex;
   flex-direction: column;
@@ -142,12 +142,12 @@ p {
 .company-switch {
   font-size: 0.66rem;
   letter-spacing: 0.1em;
-  color: #5b6962;
+  color: #657183;
   margin: 42px 0 26px;
 }
 .company-switch select {
   background: #fff;
-  color: #263d31;
+  color: #28374a;
   border-color: #d2dbd3;
   font-size: 0.8rem;
   letter-spacing: normal;
@@ -299,7 +299,7 @@ p {
   padding-top: 5px;
 }
 .muted {
-  color: #5b6962;
+  color: #657183;
   font-size: 0.8rem;
 }
 .notice {
@@ -365,7 +365,7 @@ td input {
 }
 .text-button {
   background: transparent;
-  color: #24604b;
+  color: #203b59;
   padding: 10px 0;
 }
 .text-button:hover {
@@ -384,7 +384,7 @@ td input {
   border-top: 1px solid #e7ecf1;
 }
 .resource-row a {
-  color: #24604b;
+  color: #203b59;
   display: inline-block;
   margin-right: 20px;
   font-weight: 600;
@@ -445,61 +445,6 @@ td input {
   display: grid;
   place-items: center;
   min-height: 100vh;
-}
-.auth-shell {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-.auth-story {
-  background: #1e3d30;
-  color: white;
-  padding: clamp(30px, 5vw, 80px);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 70px;
-}
-.auth-story h1 {
-  font-size: clamp(2rem, 3vw, 3.2rem);
-  line-height: 1.15;
-  margin: 20px 0 28px;
-}
-.auth-story h1 span {
-  color: #70d6bb;
-}
-.auth-story p {
-  color: #bdcddd;
-  max-width: 450px;
-}
-.auth-story .eyebrow {
-  color: #8ebdac;
-}
-.auth-footnote {
-  font-size: 0.75rem;
-}
-.auth-panel {
-  padding: clamp(28px, 5vw, 80px);
-  align-self: center;
-  max-width: 660px;
-  width: 100%;
-  margin: auto;
-}
-.auth-panel .card {
-  box-shadow: none;
-  background: transparent;
-  border: 0;
-  padding: 0;
-}
-.auth-panel h2 {
-  font-size: 1.65rem;
-  margin-bottom: 28px;
-}
-.auth-panel .fields {
-  grid-template-columns: 1fr;
-}
-.auth-panel .form-actions button {
-  width: 100%;
 }
 @media (max-width: 1100px) {
   .workspace {
@@ -576,7 +521,7 @@ td input {
 
 /* Workflow surfaces share the same typography, borders and state palette. */
 a {
-  color: #24604b;
+  color: #203b59;
   text-underline-offset: 3px;
 }
 textarea {
@@ -618,7 +563,7 @@ button {
   color: #ccdbd1;
 }
 .card {
-  border-color: #dce3dc;
+  border-color: #e0e4e9;
 }
 .badge {
   border-radius: 4px;
@@ -722,7 +667,7 @@ button {
   font-size: 0.8rem;
 }
 .attention-panel {
-  border: 1px solid #dce3dc;
+  border: 1px solid #e0e4e9;
   padding: 24px;
   background: white;
   border-radius: 7px;
@@ -751,7 +696,7 @@ button {
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid #dce3dc;
+  border: 1px solid #e0e4e9;
   background: #fff;
   border-radius: 7px;
   margin-bottom: 28px;
@@ -843,7 +788,7 @@ button {
 }
 .employee-link:hover {
   background: transparent;
-  color: #24604b;
+  color: #203b59;
 }
 .avatar {
   display: inline-grid;
@@ -912,7 +857,7 @@ button {
 .selection-list {
   max-height: 320px;
   overflow-y: auto;
-  border: 1px solid #dce3dc;
+  border: 1px solid #e0e4e9;
   border-radius: 5px;
 }
 .selection-row {

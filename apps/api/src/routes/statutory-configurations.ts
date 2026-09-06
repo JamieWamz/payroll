@@ -23,6 +23,7 @@ import {
 import { DomainError } from '../shared/domain/domain-error.js';
 import { parseEntityId } from '../shared/domain/entity-id.js';
 import { ApiError } from './api-error.js';
+import { zambia2026MonthlyReference } from '../modules/payroll/calculation/zambia-2026-reference.js';
 import { appendSuccessfulAuditEvent } from './audit.js';
 import { withAuthorizedCompanyTransaction } from './tenant-authorization.js';
 
@@ -95,6 +96,17 @@ const verifySchema = transitionSchema.extend({
 export const statutoryConfigurationRoutes: FastifyPluginAsync<
   StatutoryConfigurationRoutesOptions
 > = async (app, options) => {
+  app.get(
+    '/companies/:companyId/statutory-configurations/references/zambia-2026',
+    async (request, reply) => {
+      const params = parseInput(companyParamsSchema, request.params);
+      await authorizeReferenceRead(request, options, params.companyId);
+      await reply
+        .header('cache-control', 'no-store')
+        .send(zambia2026MonthlyReference);
+    },
+  );
+
   app.get(
     '/companies/:companyId/statutory-configurations/references/zra-paye',
     async (request, reply) => {

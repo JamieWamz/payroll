@@ -6,8 +6,8 @@ and accounting firms.
 > [!IMPORTANT]
 > The application now connects employee management, monthly payroll calculation,
 > review/finalization, PDF payslips, CSV reports and an audited manual filing
-> register. It requires operator-verified statutory rules; no approved 2026
-> configuration is bundled. Direct bank payments and authority submission are not
+> register. A sourced 2026 rules preset is available; each company records its
+> review before activating a version. Direct bank payments and authority submission are not
 > connected. Partial-month allocations, finalized corrections and certified P9 /
 > TaxOnline formats remain outside the implemented monthly workflow.
 >
@@ -16,6 +16,11 @@ and accounting firms.
 > [product audit](docs/product-audit.md) for the starting architecture and gaps.
 
 ## What exists today
+
+- An overhauled login and workspace design with an editable [Canva concept](https://www.canva.com/d/CCoad3gJ3QUt2kU), staged registration and a resumable setup guide.
+- A dated 2026 statutory preset with unchanged PAYE/NHIMA/NAPSA percentages and the revised NAPSA cap.
+- Validated employee CSV imports with review, atomic persistence and duplicate protection.
+- Expiring team invitation links, password-verified acceptance, fixed access roles and membership suspension/restoration. Invitations are shared manually; no email is sent.
 
 - A live payroll overview, URL-backed workspace navigation, searchable/paginated
   employee directory, grouped profiles, salary/component maintenance and settings.

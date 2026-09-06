@@ -259,7 +259,7 @@ describe('authenticated payroll workspace', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(
-      await screen.findByRole('heading', { name: 'Sign in to your workspace' }),
+      await screen.findByRole('heading', { name: 'Welcome back.' }),
     ).toBeInTheDocument();
     expect(fetcher).toHaveBeenCalledWith(
       '/api/auth/logout',
@@ -452,7 +452,7 @@ describe('authenticated payroll workspace', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: /People/ }));
     expect(
-      await screen.findByRole('heading', { name: 'Sign in to your workspace' }),
+      await screen.findByRole('heading', { name: 'Welcome back.' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Your session has expired',

@@ -15,8 +15,8 @@ normalized component lines in PostgreSQL. Frontend totals come from the API.
    when that is correct. Do not overlap opening balances with finalized history.
 4. Create a period in **Payroll periods** and sourced rules in **Statutory rules**.
    Review official evidence, treatment of each allowance, rates, caps, effective
-   dates and rounding before recording verification. There is no automatic 2026
-   configuration. Invalid monthly parameter structures are rejected on creation.
+   dates and rounding before recording verification. Use **Use 2026 rates** to prefill a dated draft, then save and
+   verify it after reviewing the evidence and company component treatments. Invalid monthly parameter structures are rejected on creation.
 5. Choose **Payroll → Prepare payroll**, the full monthly period, verified rules
    and employees. Calculate, inspect per-person breakdowns and resolve exceptions.
 6. Finalize after confirming review. Source changes invalidate the review and
@@ -82,3 +82,63 @@ for cleanup, and optionally `E2E_BASE_URL` (default `http://127.0.0.1:5173`). It
 creates a separate synthetic company with historical test rules and cleans up its
 records. It never installs verified rates into an existing business. Browser
 screenshots, trace and generated PDF evidence are under ignored `test-results/`.
+
+## Guided setup and employee imports
+
+New company registration has two steps: account details, then business details.
+The company opens on **Setup**. The five steps cover employer registrations,
+employees and salaries, monthly periods, reviewed rules and the first finalized
+payroll. Progress is derived from database records and survives reloads; there is
+no client-side checkbox that can mark missing records complete. The people step
+checks open employment and salary records, and the rules step checks coverage of
+a saved regular period. Calculation still validates exact dates, selected employees,
+statutory identifiers and cumulative balances.
+
+**People → Import employees** downloads a header-only CSV template, accepts up to
+250 employees / 500 KB, validates each row and previews normalized records. Confirm
+review to create employee, employment, salary and optional payroll details in one
+transaction. Repeated employee numbers, stale review digests, invalid dates or
+amounts block the entire import. Existing records are never overwritten. Retrying
+a committed file is rejected as a duplicate. Import requires both workforce-write
+and compensation-write permissions. Opening tax balances are reviewed separately
+in each employee profile.
+
+## Team access
+
+Owners use **Team** to create expiring, single-use invitation links, review invitation
+history and suspend/restore non-owner access with optimistic version checks.
+The invitation token is shown only at creation; only its digest is stored. Links
+expire after seven days and can be revoked. No invitation email is sent: the owner
+shares the link directly with its intended recipient. Tokens travel in the URL
+fragment and POST body, not API URL paths or query strings.
+
+Recipients can create an account without creating a company. Existing account
+holders must authenticate with their existing password. Failed attempts use the
+existing lockout mechanism. Accepting a link consumes it transactionally and opens
+the invited company. Owner/self access cannot be suspended through this UI.
+Suspension affects subsequent authorized requests immediately; restoring a
+membership does not require changing its account or password.
+
+Available invitation roles:
+
+- Payroll operator: employee/compensation maintenance and calculation; no finalization.
+- Payroll reviewer: employee/payroll reading and finalization; no calculation or employee edits.
+- Report reader: payroll reading and report downloads; no record changes or team management.
+
+These roles can expose sensitive company payroll information as described above.
+There is no employee self-service role. Owner transfer, configurable custom roles,
+email delivery and password recovery are separate capabilities, not implied by
+invitation support. No new environment variables are required for the manual-link
+workflow. A configured delivery provider would be required for future email flows.
+
+## 2026 monthly statutory starting point
+
+**Statutory rules → Use 2026 rates** prefills a company draft for 1 January–31 December 2026. PAYE retains cumulative monthly bounds K5,100 / K7,100 / K9,200 and rates 0% / 20% / 30% / 37%. NAPSA remains 5% each of covered gross earnings, with the annual contribution cap increased to K1,861.80 each (earnings ceiling K37,236). NHIMA remains 1% each of basic salary, with no monetary cap. Only BASE_SALARY treatment is supplied; add and review every company allowance code.
+
+Evidence reviewed 6 September 2026:
+
+- [PwC 2026 income-tax table](https://taxsummaries.pwc.com/zambia/individual/taxes-on-personal-income), reviewed 24 July 2026: annual bands divided by 12 match the existing monthly ZRA reference. The ZRA 2026 practice-note download could not be retrieved during this review; the preset labels PwC as its publisher.
+- [NAPSA notice dated 5 January 2026, copy hosted by CRS](https://www.crs.co.za/wp-content/uploads/2026/01/NAPSA_Revision_of_Contribution_Ceiling_2026.pdf), read directly and corroborated against [PwC's 2026 NAPSA update](https://taxsummaries.pwc.com/zambia/individual/significant-developments). The rate is unchanged; carrying forward the 2025 cap would be incorrect.
+- [NHIMA regulations, Third Schedule](https://www.nhima.co.zm/download/document/813df761802019102159cc9cc7.pdf), supported by the [NHIMA FAQ](https://www.nhima.co.zm/elementor-1783/).
+
+Reference retrieval writes nothing. Saving creates a draft through the existing authorized API; recorded verification is still required before calculation. The preset never updates existing configurations or finalized snapshots, and never serves as a calculator fallback. Do not extend its dates into 2027 without a new annual review.
