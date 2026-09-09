@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { WorkspaceImage } from './WorkspaceImage';
 import { request } from './api';
 import { ActionButton, Loading } from './components';
 import { useRemote } from './useRemote';
@@ -35,7 +36,8 @@ export function Setup({
   return (
     <>
       <section className="setup-heading">
-        <div>
+        <WorkspaceImage scene="studio" className="setup-photo" />
+        <div className="setup-heading-copy">
           <p className="eyebrow">A CLEAR START</p>
           <h2>Your first pay day starts here.</h2>
           <p>

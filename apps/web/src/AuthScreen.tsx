@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { WorkspaceImage } from './WorkspaceImage';
 import { message, request, type Session } from './api';
 
 export function AuthScreen({
@@ -273,23 +274,23 @@ export function AuthScreen({
             review and payslip in one place.
           </p>
         </div>
-        <div className="access-ledger">
-          <header>
-            <strong>A clear path to pay day</strong>
-            <span>MONTHLY PAYROLL</span>
-          </header>
-          {[
-            ['Bring your people together', 'People'],
-            ['Review the details', 'Payroll'],
-            ['Keep a clear record', 'Reports'],
-          ].map(([title, area], index) => (
-            <div className="ledger-step" key={title}>
-              <span className="ledger-number">0{index + 1}</span>
-              <strong>{title}</strong>
-              <span>{area}</span>
-            </div>
-          ))}
+        <div className="access-visual">
+          <WorkspaceImage scene="office" className="access-photo" priority />
+          <div className="access-photo-caption">
+            <span>ROOM TO DO YOUR BEST WORK</span>
+            <a href="https://unsplash.com" target="_blank" rel="noreferrer">
+              Photography / Unsplash ↗
+            </a>
+          </div>
         </div>
+        <ol className="access-path" aria-label="Your payroll workflow">
+          {['People', 'Payroll', 'Reports'].map((area, index) => (
+            <li key={area}>
+              <span>0{index + 1}</span>
+              <strong>{area}</strong>
+            </li>
+          ))}
+        </ol>
         <div>
           <div className="access-obligations">
             <span>PAYE</span>

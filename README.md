@@ -19,7 +19,7 @@ and accounting firms.
 
 - A bank access guide covering 15 Zambian commercial banks, downloadable onboarding briefs, salary file preparation and uploaded statement reconciliation. See [bank research and onboarding](docs/bank-integration-research.md). Live bank access requires bank approval.
 
-- An overhauled login and workspace design with an editable [Canva concept](https://www.canva.com/d/CCoad3gJ3QUt2kU), staged registration and a resumable setup guide.
+- An overhauled login and workspace design with an editable [Canva concept](https://www.canva.com/d/CCoad3gJ3QUt2kU), staged registration and a resumable setup guide. Login and setup include responsive CDN photography with local visual fallbacks.
 - A dated 2026 statutory preset with unchanged PAYE/NHIMA/NAPSA percentages and the revised NAPSA cap.
 - Validated employee CSV imports with review, atomic persistence and duplicate protection.
 - Expiring team invitation links, password-verified acceptance, fixed access roles and membership suspension/restoration. Invitations are shared manually; no email is sent.

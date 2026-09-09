@@ -68,10 +68,33 @@ test('register, manage employee, calculate, finalize, export, record filing and 
     await expect(
       page.getByRole('list', { name: 'Company setup steps' }),
     ).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          page
+            .locator('.setup-photo img')
+            .evaluate(
+              (element: HTMLImageElement) =>
+                element.complete && element.naturalWidth > 0,
+            ),
+        { timeout: 30000 },
+      )
+      .toBe(true);
     await page.screenshot({
       path: testInfo.outputPath('setup-desktop.png'),
       fullPage: true,
     });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath('setup-mobile.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 800 });
     console.info('Browser: registration complete');
     companyId = session.companies[0]!.id;
     userId = session.user.id;

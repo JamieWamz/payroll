@@ -592,53 +592,6 @@ p {
   font-size: 1.02rem;
   line-height: 1.8;
 }
-.access-ledger {
-  margin: 38px 0;
-  border: 1px solid #4b5d72;
-  border-radius: 9px;
-  padding: 25px;
-  background: #1c3048;
-}
-.access-ledger header {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  border-bottom: 1px solid #4b5d72;
-  padding-bottom: 21px;
-  align-items: center;
-}
-.access-ledger header strong {
-  font-size: 0.87rem;
-}
-.access-ledger header span {
-  font-size: 0.57rem;
-  color: var(--copper-light);
-  letter-spacing: 0.06em;
-}
-.ledger-step {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-  border-bottom: 1px solid #3d5066;
-  padding: 20px 0;
-}
-.ledger-step:last-child {
-  border: 0;
-  padding-bottom: 0;
-}
-.ledger-number {
-  color: var(--copper-light);
-  font-size: 0.71rem;
-}
-.ledger-step strong {
-  font-size: 0.91rem;
-  font-weight: 500;
-}
-.ledger-step > span:last-child {
-  margin-left: auto;
-  color: #a6b7ca;
-  font-size: 0.73rem;
-}
 .access-obligations {
   display: flex;
   gap: 25px;
@@ -1059,14 +1012,8 @@ progress {
     font-size: 2.7rem;
     margin-top: 22px;
   }
-  .access-ledger {
-    margin: 27px 0;
-  }
   .access-story .access-obligations {
     gap: 20px;
-  }
-  .access-ledger header {
-    flex-direction: row;
   }
   .access-footer {
     padding-top: 20px;
@@ -1204,5 +1151,141 @@ progress {
   }
   .bank-selector .badge {
     align-self: start;
+  }
+}
+
+/* Public photography complements the forms; failed loads retain the composition. */
+.workspace-image {
+  position: relative;
+  overflow: hidden;
+  background: #31475b;
+  background-image: linear-gradient(145deg, #577082, #243a50 65%, #956b4d);
+  min-width: 0;
+}
+.workspace-image::after {
+  content: '';
+  position: absolute;
+  inset: 16%;
+  border: 1px solid rgb(255 255 255 / 14%);
+  pointer-events: none;
+}
+.workspace-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: relative;
+  z-index: 1;
+}
+.access-story {
+  padding: 38px;
+}
+.access-story h2 {
+  margin: 18px 0 16px;
+}
+.access-visual {
+  margin-top: 24px;
+}
+.access-photo {
+  height: clamp(170px, 22vw, 270px);
+  border-radius: 7px;
+}
+.access-photo img {
+  object-position: center 58%;
+}
+.access-photo-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 11px;
+  font-size: 0.6rem;
+  letter-spacing: 0.07em;
+  color: #b9c4d2;
+}
+.access-photo-caption a {
+  color: #dcb48f;
+  letter-spacing: 0;
+}
+.access-path {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  padding: 20px 0;
+  margin: 20px 0;
+  border-top: 1px solid #41546b;
+  border-bottom: 1px solid #41546b;
+  gap: 15px;
+}
+.access-path li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.access-path span {
+  font-size: 0.68rem;
+  color: var(--copper-light);
+}
+.access-path strong {
+  font-weight: 500;
+  font-size: 0.83rem;
+}
+.setup-heading {
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  gap: 24px;
+}
+.setup-photo {
+  width: 190px;
+  height: 165px;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+.setup-heading-copy {
+  flex: 1;
+  min-width: 0;
+}
+.setup-heading-copy h2 {
+  margin-top: 8px;
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+.setup-heading-copy p:last-child {
+  margin-bottom: 0;
+}
+@media (min-width: 751px) and (max-width: 1150px) {
+  .setup-photo {
+    width: 130px;
+  }
+  .setup-heading {
+    gap: 16px;
+  }
+}
+@media (max-width: 750px) {
+  .access-story {
+    padding: 26px;
+  }
+  .access-photo {
+    height: 200px;
+  }
+  .access-photo-caption {
+    flex-wrap: wrap;
+  }
+  .setup-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 85px;
+    gap: 18px;
+  }
+  .setup-photo {
+    width: 100%;
+    height: 150px;
+    grid-column: 1 / -1;
+  }
+  .setup-completion {
+    align-self: center;
+  }
+  .setup-heading-copy h2 {
+    font-size: 1.3rem;
   }
 }
