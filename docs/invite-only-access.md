@@ -1,0 +1,62 @@
+# Invite-only access
+
+New company accounts require an invitation issued by the deployment operator.
+There is no public signup switch, including in development and tests. Company
+owners can invite staff into their existing company from Team; they cannot
+issue new workspace invitations or create another company without approval.
+
+## Issue a company invitation
+
+After reviewing the customer and commercial agreement, run this from a trusted
+operator checkout with `DATABASE_MIGRATION_URL` set to the migration connection
+and `WEB_ORIGIN` set to the exact application origin. Keep those credentials out
+of the API container, browser, repository and support messages.
+
+```sh
+npm run access:workspace -- create \
+  --email owner@example.com \
+  --company-code example-company \
+  --company-name 'Example Company' \
+  --operator 'Your operator name' \
+  --out /absolute/private/path/company-invitation.txt
+```
+
+The command writes the link to a new file with owner-only permissions. It never
+prints the token and never sends email. Share the file's link privately with the
+intended owner. The link binds the company name, code and account email, expires
+after seven days, and can be accepted only once. Treat it as a credential.
+
+For a compiled production checkout, run `node apps/api/dist/scripts/workspace-access.js`
+with the same arguments and operator environment. The command is available in
+the API image at `dist/scripts/workspace-access.js`, but execute it as a separate
+one-off operator process with migration credentials, never through a public route.
+
+```sh
+npm run access:workspace -- list
+npm run access:workspace -- revoke --id INVITATION_UUID --operator 'Your operator name'
+```
+
+Revoke an expired or unwanted pending invitation before issuing a replacement
+for the same company code. Listing shows at most the latest 100 invitations and
+contains customer contact information. Accepted invitations cannot be revoked;
+review the existing company's access instead. Issuance, revocation and acceptance
+have dedicated audit events. Only token digests are stored in the database.
+
+## Acceptance and account protection
+
+The owner opens `/#workspace-invite=…`, verifies the company and email displayed,
+and enters their name and password. New users choose a passphrase of at least
+15 characters; existing users must use their current password. An invitation
+cannot reset or take over an existing account. Existing memberships are retained.
+Successful acceptance signs in the owner and opens Setup.
+
+The API rejects `/api/auth/register` without an invitation, independently of the
+UI. PostgreSQL also denies the runtime role direct execution of the original
+unrestricted registration function. Acceptance locks the invitation row and
+creates the account, company, permissions and acceptance event in one transaction.
+Staff invitations continue to use `/#invite=…` and the company's authorized Team flow.
+
+Apply the invitation migration before starting the new API. The previous API's
+public registration stops working after the migration. Do not roll this migration
+back in production: its Down section restores the old registration capability.
+Use reviewed forward migrations for recovery. Existing accounts continue to sign in.

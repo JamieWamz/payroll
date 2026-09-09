@@ -1,3 +1,4 @@
+import { withWorkspaceInvitation } from './helpers/workspace-invitation.js';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { beforeAll, afterAll, describe, it, expect } from 'vitest';
@@ -33,13 +34,13 @@ describe.runIf(url && migrationUrl)(
       const response = await app.inject({
         method: 'POST',
         url: '/api/auth/register',
-        payload: {
+        payload: await withWorkspaceInvitation({
           companyCode: marker,
           companyName: 'Setup test',
           displayName: 'Owner',
           email: `${marker}@example.com`,
           password,
-        },
+        }),
       });
       expect(response.statusCode, response.body).toBe(201);
       const session = response.json();
@@ -288,13 +289,13 @@ describe.runIf(url && migrationUrl)(
       const second = await app.inject({
         method: 'POST',
         url: '/api/auth/register',
-        payload: {
+        payload: await withWorkspaceInvitation({
           companyCode: `${marker}-b`,
           companyName: 'Second company',
           displayName: 'Second owner',
           email: `${marker}-existing@example.com`,
           password,
-        },
+        }),
       });
       expect(second.statusCode, second.body).toBe(201);
       companyIds.push(second.json().companies[0].id);

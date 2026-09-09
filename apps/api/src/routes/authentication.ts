@@ -68,6 +68,10 @@ const registrationSchema = z
     displayName: z.string().max(240),
     email: z.string().max(320),
     password: z.string().max(256),
+    inviteToken: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{43}$/)
+      .optional(),
   })
   .strict();
 const loginSchema = z
@@ -89,6 +93,14 @@ export const authenticationRoutes: FastifyPluginAsync<
     { config: { rateLimit: { max: 3, timeWindow: '1 minute' } } },
     async (request, reply) => {
       const body = parseBody(registrationSchema, request.body);
+      if (!body.inviteToken)
+        throw new ApiError(
+          403,
+          'Company accounts are invitation-only. Use the invitation link provided by ZamPayroll.',
+        );
+      const digest = digestSecurityToken(
+        parseOpaqueSecurityToken(body.inviteToken),
+      );
       const userAccountId = randomUUID();
       const companyId = randomUUID();
       const membershipId = randomUUID();
@@ -103,63 +115,177 @@ export const authenticationRoutes: FastifyPluginAsync<
         id: companyId,
         name: body.companyName,
       });
-      const password = await validateNewPassword(
-        body.password,
-        passwordBlocklist,
-      );
-      const passwordHash = await hashPassword(password);
       const session = createNewSession(options.environment);
-
+      let authenticated;
       try {
-        await options.database.withSystemTransaction(async (transaction) => {
-          await transaction.query(
-            `SELECT app.register_company_owner(
-               $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+        authenticated = await options.database.withSystemTransaction(
+          async (transaction) => {
+            const invitation = (
+              await transaction.query<{
+                email: string;
+                companyCode: string;
+                companyName: string;
+              }>(
+                'SELECT email, company_code AS "companyCode", company_name AS "companyName" FROM app.inspect_workspace_invitation($1)',
+                [digest],
+              )
+            ).rows[0];
+            if (!invitation)
+              throw new ApiError(
+                409,
+                'This invitation is invalid, expired or already used. Ask ZamPayroll for a new link.',
+              );
+            if (
+              invitation.email !== user.email ||
+              invitation.companyCode !== company.code ||
+              invitation.companyName !== company.name
+            ) {
+              throw new ApiError(
+                403,
+                'Account and company details must match the invitation.',
+              );
+            }
+            const existing = await findAuthenticationRecord(
+              transaction,
+              invitation.email,
+            );
+            if (existing) {
+              const matches = await verifyPassword(
+                parsePasswordHash(existing.passwordHash),
+                body.password,
+              );
+              const locked =
+                existing.lockedUntil !== null &&
+                existing.lockedUntil.getTime() > Date.now();
+              if (!matches || locked || existing.accountStatus !== 'active') {
+                if (!matches && !locked)
+                  await transaction.query(
+                    'SELECT app.record_authentication_failure($1)',
+                    [existing.userAccountId],
+                  );
+                await appendDeniedLoginAudit(
+                  transaction,
+                  existing.userAccountId,
+                  request.id,
+                );
+                return undefined;
+              }
+              await transaction.query(
+                'SELECT app.record_authentication_success($1)',
+                [existing.userAccountId],
+              );
+            }
+            const acceptedUser = existing
+              ? createUserAccount({
+                  id: existing.userAccountId,
+                  email: existing.email,
+                  displayName: existing.displayName,
+                })
+              : user;
+            const passwordHash = existing
+              ? null
+              : await hashPassword(
+                  await validateNewPassword(body.password, passwordBlocklist),
+                );
+            if (existing)
+              await persistSession(
+                transaction,
+                acceptedUser.id,
+                session,
+                request.id,
+              );
+            await transaction.query(
+              `SELECT app.accept_workspace_invitation(
+               $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
              )`,
-            [
-              user.id,
-              company.id,
-              membershipId,
-              roleId,
-              user.email,
-              user.displayName,
-              company.code,
-              company.name,
-              passwordHash,
-              randomUUID(),
-              request.id,
-              null,
-            ],
-          );
-          await persistSession(transaction, user.id, session, request.id);
-        });
+              [
+                digest,
+                acceptedUser.id,
+                company.id,
+                membershipId,
+                roleId,
+                acceptedUser.displayName,
+                passwordHash,
+                existing ? session.secrets.sessionTokenDigest : null,
+                randomUUID(),
+                request.id,
+              ],
+            );
+            if (!existing)
+              await persistSession(
+                transaction,
+                acceptedUser.id,
+                session,
+                request.id,
+              );
+            return {
+              user: acceptedUser,
+              memberships: (
+                await findMemberships(transaction, acceptedUser.id)
+              ).toSorted(
+                (a, b) =>
+                  Number(b.companyId === company.id) -
+                  Number(a.companyId === company.id),
+              ),
+            };
+          },
+        );
       } catch (error) {
         if (isPostgresError(error, '23505')) {
           throw new ApiError(409, 'Account or company already exists');
         }
+        if (isPostgresError(error, '22023'))
+          throw new ApiError(
+            409,
+            'Invitation changed or can no longer be accepted. Ask ZamPayroll for a new link.',
+          );
         throw error;
       }
 
+      if (!authenticated)
+        throw new ApiError(
+          401,
+          'The account credentials could not be verified. If you already have an account, use its existing password.',
+        );
       setAuthenticationCookies(reply, options.environment, session);
       await reply
         .status(201)
         .header('cache-control', 'no-store')
         .send({
-          companies: [
-            {
-              code: company.code,
-              id: company.id,
-              membershipId,
-              name: company.name,
-            },
-          ],
+          companies: serializeMemberships(authenticated.memberships),
           csrfToken: session.secrets.csrfToken,
           user: {
-            displayName: user.displayName,
-            email: user.email,
-            id: user.id,
+            displayName: authenticated.user.displayName,
+            email: authenticated.user.email,
+            id: authenticated.user.id,
           },
         });
+    },
+  );
+
+  app.post(
+    '/auth/workspace-invitation',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const { token } = parseBody(
+        z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict(),
+        request.body,
+      );
+      const invitation = await options.database.withSystemTransaction(
+        async (tx) =>
+          (
+            await tx.query(
+              'SELECT email, company_code AS "companyCode", company_name AS "companyName" FROM app.inspect_workspace_invitation($1)',
+              [digestSecurityToken(parseOpaqueSecurityToken(token))],
+            )
+          ).rows[0],
+      );
+      if (!invitation)
+        throw new ApiError(
+          404,
+          'This invitation is invalid, expired or already used. Ask ZamPayroll for a new link.',
+        );
+      return reply.header('cache-control', 'no-store').send(invitation);
     },
   );
 

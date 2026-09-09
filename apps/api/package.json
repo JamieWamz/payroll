@@ -10,6 +10,7 @@
     "npm": ">=11 <12"
   },
   "scripts": {
+    "access:workspace": "node --env-file-if-exists=../../.env --import tsx src/scripts/workspace-access.ts",
     "build": "tsc --project tsconfig.build.json",
     "db:migrate": "node --env-file-if-exists=../../.env ../../node_modules/node-pg-migrate/bin/node-pg-migrate.js up --database-url-var DATABASE_MIGRATION_URL --migrations-dir migrations --migrations-schema zampayroll_internal --create-migrations-schema --migrations-table schema_migrations --check-order --single-transaction --advisory-lock-mode fail",
     "db:migrate:create": "node --env-file-if-exists=../../.env ../../node_modules/node-pg-migrate/bin/node-pg-migrate.js create --migrations-dir migrations --migration-file-language sql --migration-filename-format utc",

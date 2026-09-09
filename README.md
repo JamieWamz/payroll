@@ -1,7 +1,12 @@
 # ZamPayroll
 
 ZamPayroll is a Zambia-specific payroll SaaS under active development for SMEs
-and accounting firms.
+and accounting firms. Powered by **Wamz Technologies**.
+
+Account creation is **invite-only**. The deployment operator issues invitations
+for new companies; company owners invite their staff from Team. See
+[invitation operations](docs/invite-only-access.md) and
+[branches and production preparation](docs/production-readiness.md).
 
 > [!IMPORTANT]
 > The application now connects employee management, monthly payroll calculation,
@@ -19,7 +24,7 @@ and accounting firms.
 
 - A bank access guide covering 15 Zambian commercial banks, downloadable onboarding briefs, salary file preparation and uploaded statement reconciliation. See [bank research and onboarding](docs/bank-integration-research.md). Live bank access requires bank approval.
 
-- An overhauled login and workspace design with an editable [Canva concept](https://www.canva.com/d/CCoad3gJ3QUt2kU), staged registration and a resumable setup guide. Login and setup include responsive CDN photography with local visual fallbacks.
+- An overhauled login and workspace design with an editable [Canva concept](https://www.canva.com/d/CCoad3gJ3QUt2kU), invitation acceptance and a resumable setup guide. Login and setup include responsive CDN photography with local visual fallbacks.
 - A dated 2026 statutory preset with unchanged PAYE/NHIMA/NAPSA percentages and the revised NAPSA cap.
 - Validated employee CSV imports with review, atomic persistence and duplicate protection.
 - Expiring team invitation links, password-verified acceptance, fixed access roles and membership suspension/restoration. Invitations are shared manually; no email is sent.

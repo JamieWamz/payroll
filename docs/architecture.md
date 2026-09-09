@@ -1,5 +1,9 @@
 # ZamPayroll Architecture
 
+Current account provisioning is operator-controlled and invitation-only. See
+[invite-only access](invite-only-access.md) for the API, database and operational
+boundaries; this supersedes the original public-registration design below.
+
 ## Status and scope
 
 This document distinguishes the completed Phase 1 repository foundation and

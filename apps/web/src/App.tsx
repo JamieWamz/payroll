@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 import { message, request, RequestError, type Session } from './api';
 import { JoinCompany } from './JoinCompany';
+import { ActivateWorkspace } from './ActivateWorkspace';
 import { AuthScreen } from './AuthScreen';
 import { Workspace } from './Workspace';
 import './styles.css';
 import './product.css';
 export function App() {
+  const [workspaceToken, setWorkspaceToken] = useState(
+    () =>
+      /^#workspace-invite=([A-Za-z0-9_-]{43})$/.exec(
+        window.location.hash,
+      )?.[1] ?? '',
+  );
   const [inviteToken, setInviteToken] = useState(
     () => /^#invite=([A-Za-z0-9_-]{43})$/.exec(window.location.hash)?.[1] ?? '',
   );
@@ -14,7 +21,12 @@ export function App() {
       const token = /^#invite=([A-Za-z0-9_-]{43})$/.exec(
         window.location.hash,
       )?.[1];
-      if (token) setInviteToken(token);
+      setInviteToken(token ?? '');
+      setWorkspaceToken(
+        /^#workspace-invite=([A-Za-z0-9_-]{43})$/.exec(
+          window.location.hash,
+        )?.[1] ?? '',
+      );
     };
     window.addEventListener('hashchange', readInvitation);
     return () => window.removeEventListener('hashchange', readInvitation);
@@ -48,9 +60,27 @@ export function App() {
       window.removeEventListener('payroll-session-expired', expired);
     };
   }, []);
+  if (workspaceToken && !checking)
+    return (
+      <ActivateWorkspace
+        key={workspaceToken}
+        token={workspaceToken}
+        done={(value) => {
+          window.history.replaceState(null, '', '#Setup');
+          setWorkspaceToken('');
+          setSession(value);
+          setError('');
+        }}
+        cancel={() => {
+          window.history.replaceState(null, '', '/');
+          setWorkspaceToken('');
+        }}
+      />
+    );
   if (inviteToken && !checking)
     return (
       <JoinCompany
+        key={inviteToken}
         token={inviteToken}
         done={(value) => {
           window.history.replaceState(null, '', '#Overview');

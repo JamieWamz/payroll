@@ -3,6 +3,10 @@ import { test, expect } from '@playwright/test';
 test('public CDN photography loads under the deployed image policy', async ({
   page,
 }, testInfo) => {
+  test.skip(
+    process.env['E2E_LIVE_CDN'] !== '1',
+    'Enable E2E_LIVE_CDN=1 for the external CDN availability check.',
+  );
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   const image = page.locator('.access-photo img');

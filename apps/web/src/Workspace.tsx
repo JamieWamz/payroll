@@ -1,3 +1,4 @@
+import { Brand } from './Brand';
 import { useEffect, useState } from 'react';
 import { message, request, type Session } from './api';
 import { DataTable, EntryForm, Loading, type Field } from './components';
@@ -117,9 +118,7 @@ export function Workspace({
         Skip to content
       </a>
       <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">Z</span>ZamPayroll
-        </div>
+        <Brand />
         <label className="company-switch">
           COMPANY
           <select

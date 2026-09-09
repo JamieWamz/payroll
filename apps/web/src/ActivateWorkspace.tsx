@@ -2,7 +2,14 @@ import { Brand } from './Brand';
 import { useEffect, useState } from 'react';
 import { message, request, type Session } from './api';
 import { EntryForm, Loading } from './components';
-export function JoinCompany({
+
+interface WorkspaceInvitation {
+  email: string;
+  companyCode: string;
+  companyName: string;
+}
+
+export function ActivateWorkspace({
   token,
   done,
   cancel,
@@ -11,23 +18,19 @@ export function JoinCompany({
   done: (session: Session) => void;
   cancel: () => void;
 }) {
-  const [invitation, setInvitation] = useState<{
-    companyName: string;
-    email: string;
-    role: string;
-  }>();
+  const [invitation, setInvitation] = useState<WorkspaceInvitation>();
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    void request<{ companyName: string; email: string; role: string }>(
-      '/auth/invitation',
-      { body: { token }, signal: controller.signal },
-    )
+    void request<WorkspaceInvitation>('/auth/workspace-invitation', {
+      body: { token },
+      signal: controller.signal,
+    })
       .then((value) => {
         if (!controller.signal.aborted) setInvitation(value);
       })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(message(e));
+      .catch((failure) => {
+        if (!controller.signal.aborted) setError(message(failure));
       });
     return () => controller.abort();
   }, [token]);
@@ -35,13 +38,13 @@ export function JoinCompany({
     <main className="join-shell">
       <Brand />
       <section className="join-panel">
-        <p className="eyebrow">YOUR TEAM IS EXPECTING YOU</p>
-        <h1>Join your company.</h1>
+        <p className="eyebrow">YOUR WORKSPACE INVITATION</p>
+        <h1>Welcome to your workspace.</h1>
         {invitation ? (
           <>
             <p>
-              You’ve been invited to <strong>{invitation.companyName}</strong>{' '}
-              as a <strong>{invitation.role.replaceAll('-', ' ')}</strong>.
+              Activate <strong>{invitation.companyName}</strong> (
+              {invitation.companyCode}) and set up your payroll.
             </p>
             <p className="notice">
               This invitation is for {invitation.email}. If you already use
@@ -50,7 +53,7 @@ export function JoinCompany({
             </p>
             <EntryForm
               title="Your account"
-              submit="Accept invitation & sign in"
+              submit="Accept invitation & set up payroll"
               fields={[
                 { name: 'displayName', label: 'Your name', maxLength: 120 },
                 {
@@ -61,8 +64,8 @@ export function JoinCompany({
                 },
               ]}
               action={async (values) => {
-                const session = await request<Session>('/auth/join-company', {
-                  body: { ...values, token },
+                const session = await request<Session>('/auth/register', {
+                  body: { ...values, ...invitation, inviteToken: token },
                 });
                 done(session);
                 return '';

@@ -75,6 +75,27 @@ h2 {
   width: 33px;
   height: 35px;
 }
+.product-brand {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+.brand-endorsement {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #52616e;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.brand-endorsement img {
+  display: block;
+  width: 124px;
+  height: 31px;
+  object-fit: contain;
+}
 .eyebrow {
   color: #738094;
   letter-spacing: 0.13em;

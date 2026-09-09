@@ -1,10 +1,10 @@
 # Security Policy
 
-ZamPayroll is currently in Phase 2 foundation work. It does not yet process
-real payroll or statutory calculations, and it has not been declared
-production-ready. Registration, login, cookie sessions, CSRF-checked logout,
-credential lockout, audit, and tenant-isolated data primitives now exist, so
-security reports about those boundaries are important.
+ZamPayroll implements monthly payroll workflows and has not been declared
+production-ready. Account creation is invitation-only. Operator-issued company
+invitations, tenant team invitations, login, cookie sessions, CSRF, credential
+lockout, audit and tenant isolation are active security boundaries. Hosting,
+backup restoration and deployment controls require commissioning before live use.
 
 ## Supported versions
 

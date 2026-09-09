@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
+import { issueWorkspaceInvitation } from '../../apps/api/src/modules/identity-access/application/workspace-invitations.js';
 
-test('register, manage employee, calculate, finalize, export, record filing and restore session', async ({
+test('accept invitation, manage employee, calculate, finalize, export, record filing and restore session', async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -17,8 +18,21 @@ test('register, manage employee, calculate, finalize, export, record filing and 
   let userId = '';
   const invitedUserIds: string[] = [];
   const errors: string[] = [];
+  const operatorPool = new Pool({
+    connectionString: process.env['TEST_DATABASE_MIGRATION_URL'],
+  });
+  const invitation = await issueWorkspaceInvitation(operatorPool, {
+    email,
+    companyCode: marker,
+    companyName: 'Payroll Browser Test',
+    operator: 'browser-test',
+  });
   page.on('pageerror', (error) => errors.push(error.message));
   try {
+    if (process.env['E2E_LIVE_CDN'] !== '1')
+      await page.route('https://images.unsplash.com/**', (route) =>
+        route.abort(),
+      );
     await page.goto('/');
     await expect(
       page.getByRole('heading', { name: 'Welcome back.' }),
@@ -38,22 +52,19 @@ test('register, manage employee, calculate, finalize, export, record filing and 
       fullPage: true,
     });
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.getByRole('button', { name: 'Create a workspace' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Create a workspace' }),
+    ).toHaveCount(0);
+    await expect(page.getByText(/Access is by invitation only/)).toBeVisible();
+    await page.goto(`/#workspace-invite=${invitation.token}`);
+    await expect(
+      page.getByRole('heading', { name: 'Welcome to your workspace.' }),
+    ).toBeVisible();
     await page.getByLabel('Your name').fill('Browser Test Owner');
-    await page.getByLabel('Email address').fill(email);
     await page.getByLabel('Password', { exact: true }).fill(password);
-    await page.getByRole('button', { name: 'Show password' }).click();
-    await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute(
-      'type',
-      'text',
-    );
-    await page.getByRole('button', { name: 'Hide password' }).click();
     await page
-      .getByRole('button', { name: 'Continue to business details' })
+      .getByRole('button', { name: 'Accept invitation & set up payroll' })
       .click();
-    await page.getByLabel('Company name').fill('Payroll Browser Test');
-    await page.getByLabel('Company code').fill(marker);
-    await page.getByRole('button', { name: 'Create company account' }).click();
     await expect(
       page.getByRole('heading', { name: 'Setup', exact: true }),
     ).toBeVisible();
@@ -68,18 +79,19 @@ test('register, manage employee, calculate, finalize, export, record filing and 
     await expect(
       page.getByRole('list', { name: 'Company setup steps' }),
     ).toBeVisible();
-    await expect
-      .poll(
-        () =>
-          page
-            .locator('.setup-photo img')
-            .evaluate(
-              (element: HTMLImageElement) =>
-                element.complete && element.naturalWidth > 0,
-            ),
-        { timeout: 30000 },
-      )
-      .toBe(true);
+    if (process.env['E2E_LIVE_CDN'] === '1')
+      await expect
+        .poll(
+          () =>
+            page
+              .locator('.setup-photo img')
+              .evaluate(
+                (element: HTMLImageElement) =>
+                  element.complete && element.naturalWidth > 0,
+              ),
+          { timeout: 30000 },
+        )
+        .toBe(true);
     await page.screenshot({
       path: testInfo.outputPath('setup-desktop.png'),
       fullPage: true,
@@ -568,7 +580,27 @@ test('register, manage employee, calculate, finalize, export, record filing and 
     ).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
-    if (companyId) await cleanUpCompany(companyId, [userId, ...invitedUserIds]);
+    try {
+      // Recover identifiers even if the browser failed immediately after acceptance.
+      const accepted = (
+        await operatorPool.query(
+          'SELECT accepted_company_id,accepted_by_user_id FROM app.workspace_invitations WHERE id=$1',
+          [invitation.id],
+        )
+      ).rows[0];
+      if (!companyId && accepted?.accepted_company_id) {
+        companyId = accepted.accepted_company_id;
+        userId = accepted.accepted_by_user_id;
+      }
+      if (companyId)
+        await cleanUpCompany(companyId, [userId, ...invitedUserIds]);
+      await operatorPool.query(
+        'DELETE FROM app.workspace_invitations WHERE id=$1',
+        [invitation.id],
+      );
+    } finally {
+      await operatorPool.end();
+    }
   }
 });
 

@@ -1,3 +1,4 @@
+import { withWorkspaceInvitation } from './helpers/workspace-invitation.js';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -56,7 +57,7 @@ describe.runIf(
   it('rejects a blocked password without creating an account', async () => {
     const response = await requireApp().inject({
       method: 'POST',
-      payload: registrationPayload('passwordpassword'),
+      payload: await registrationPayload('passwordpassword'),
       url: '/api/auth/register',
     });
 
@@ -67,7 +68,7 @@ describe.runIf(
   it('registers, restores a session, enforces CSRF, logs out, and logs in', async () => {
     const registration = await requireApp().inject({
       method: 'POST',
-      payload: registrationPayload(validPassword),
+      payload: await registrationPayload(validPassword),
       url: '/api/auth/register',
     });
     expect(registration.statusCode).toBe(201);
@@ -99,7 +100,7 @@ describe.runIf(
 
     const duplicate = await requireApp().inject({
       method: 'POST',
-      payload: registrationPayload(validPassword),
+      payload: await registrationPayload(validPassword),
       url: '/api/auth/register',
     });
     expect(duplicate.statusCode).toBe(409);
@@ -184,13 +185,13 @@ describe.runIf(
 });
 
 function registrationPayload(password: string) {
-  return {
+  return withWorkspaceInvitation({
     companyCode: fixtureCompanyCode,
     companyName: 'Authentication Route Company',
     displayName: 'Route Owner',
     email: fixtureEmail,
     password,
-  };
+  });
 }
 
 function readCookies(value: string | string[] | undefined) {

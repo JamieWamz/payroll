@@ -1,3 +1,4 @@
+import { withWorkspaceInvitation } from './helpers/workspace-invitation.js';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -474,13 +475,13 @@ describe.runIf(
   ): Promise<{ companyId: string; cookie: string; csrfToken: string }> {
     const response = await requireApp().inject({
       method: 'POST',
-      payload: {
+      payload: await withWorkspaceInvitation({
         companyCode: identity.code,
         companyName,
         displayName: 'Workforce Route Owner',
         email: identity.email,
         password,
-      },
+      }),
       url: '/api/auth/register',
     });
     expect(response.statusCode).toBe(201);
