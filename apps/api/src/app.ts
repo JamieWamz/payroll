@@ -9,6 +9,7 @@ import Fastify, {
 } from 'fastify';
 
 import type { Environment } from './config/environment.js';
+import { safeError } from './config/logger.js';
 import type { Database } from './infrastructure/database.js';
 import type { PasswordBlocklist } from './modules/identity-access/security/index.js';
 import { DomainError } from './shared/domain/domain-error.js';
@@ -44,11 +45,25 @@ export async function buildApp({
   const app = Fastify({
     bodyLimit: 1_048_576,
     logController: new LogController({
-      disableRequestLogging: environment.NODE_ENV === 'test',
+      disableRequestLogging: true,
     }),
     logger,
     trustProxy: environment.TRUST_PROXY,
   });
+
+  if (environment.NODE_ENV !== 'test') {
+    app.addHook('onResponse', async (request, reply) => {
+      request.log.info(
+        {
+          method: request.method,
+          route: request.routeOptions.url ?? 'unmatched',
+          statusCode: reply.statusCode,
+          durationMs: Math.round(reply.elapsedTime),
+        },
+        'Request completed',
+      );
+    });
+  }
 
   await app.register(helmet, {
     contentSecurityPolicy: false,
@@ -68,7 +83,10 @@ export async function buildApp({
             ? error.statusCode
             : 500;
 
-      request.log.error({ error, requestId: request.id }, 'Request failed');
+      request.log[statusCode >= 500 ? 'error' : 'warn'](
+        { failure: safeError(error), statusCode, requestId: request.id },
+        'Request failed',
+      );
 
       await reply.status(statusCode).send({
         error: statusCode === 500 ? 'Internal Server Error' : error.name,

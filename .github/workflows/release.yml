@@ -1,0 +1,69 @@
+name: Release images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  branch:
+    name: Check release branch
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Allow tested staging and production branches
+        env:
+          RELEASE_BRANCH: ${{ github.ref }}
+        run: |
+          [[ "$RELEASE_BRANCH" == refs/heads/main || "$RELEASE_BRANCH" == refs/heads/develop ]]
+
+  verify:
+    needs: branch
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish verified images
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    steps:
+      - name: Check out verified source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and publish immutable commit tags
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          registry="ghcr.io/${RELEASE_REPOSITORY,,}"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          printf '## Verified image digests\n\n' >> "$GITHUB_STEP_SUMMARY"
+          for component in api migrate web; do
+            dockerfile=apps/api/Dockerfile
+            if [[ "$component" == web ]]; then dockerfile=apps/web/Dockerfile; fi
+            image="$registry/$component:$RELEASE_SHA"
+            docker build --pull --file "$dockerfile" --target "$component" --tag "$image" \
+              --label "org.opencontainers.image.source=https://github.com/$RELEASE_REPOSITORY" \
+              --label "org.opencontainers.image.revision=$RELEASE_SHA" .
+            docker push "$image"
+            digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$image")"
+            [[ "$digest" == "$registry/$component@sha256:"* ]]
+            printf '%s_IMAGE=%s\n' "${component^^}" "$digest" >> release-images.env
+            printf -- '- `%s`\n' "$digest" >> "$GITHUB_STEP_SUMMARY"
+          done
+          printf '\nImage publication does not deploy a server. Follow docs/production-readiness.md.\n' >> "$GITHUB_STEP_SUMMARY"

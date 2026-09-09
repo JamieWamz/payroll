@@ -62,6 +62,41 @@ const environmentSchema = z
       path: ['SESSION_ABSOLUTE_TTL_SECONDS'],
     },
   )
+  .superRefine((environment, context) => {
+    let origin: URL;
+    try {
+      origin = new URL(environment.WEB_ORIGIN);
+    } catch {
+      return;
+    }
+    if (
+      !['http:', 'https:'].includes(origin.protocol) ||
+      origin.origin !== environment.WEB_ORIGIN
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['WEB_ORIGIN'],
+        message:
+          'must be an HTTP(S) origin without credentials, path, query or fragment',
+      });
+    }
+    if (environment.NODE_ENV === 'production') {
+      if (!environment.SESSION_COOKIE_SECURE) {
+        context.addIssue({
+          code: 'custom',
+          path: ['SESSION_COOKIE_SECURE'],
+          message: 'must be true in production',
+        });
+      }
+      if (origin.protocol !== 'https:') {
+        context.addIssue({
+          code: 'custom',
+          path: ['WEB_ORIGIN'],
+          message: 'must use HTTPS in production',
+        });
+      }
+    }
+  })
   .readonly();
 
 export type Environment = z.infer<typeof environmentSchema>;

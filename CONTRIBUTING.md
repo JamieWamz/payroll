@@ -22,7 +22,9 @@ speed or a convincing demo.
    contributor.
 
 Follow the setup instructions in the README, then create a focused branch from
-the latest `main`.
+the latest `develop`, named `feature/short-description`. Open feature pull
+requests into `develop`; promote reviewed changes from `develop` to `main`.
+`main` is the production branch. See [release operations](docs/production-readiness.md).
 
 ## Engineering requirements
 

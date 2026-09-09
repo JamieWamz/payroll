@@ -27,6 +27,39 @@ describe('loadEnvironment', () => {
     });
   });
 
+  it('requires HTTPS and secure cookies in production', () => {
+    const production = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://app:test@localhost:5432/zampayroll',
+      WEB_ORIGIN: 'https://payroll.example.com',
+      SESSION_COOKIE_SECURE: 'true',
+    };
+    expect(loadEnvironment(production).SESSION_COOKIE_SECURE).toBe(true);
+    expect(() =>
+      loadEnvironment({ ...production, SESSION_COOKIE_SECURE: 'false' }),
+    ).toThrow('SESSION_COOKIE_SECURE');
+    expect(() =>
+      loadEnvironment({
+        ...production,
+        WEB_ORIGIN: 'http://payroll.example.com',
+      }),
+    ).toThrow('HTTPS');
+  });
+
+  it.each([
+    'https://user:pass@example.com',
+    'https://example.com/path',
+    'https://example.com?token=hidden',
+    'ftp://example.com',
+  ])('rejects an ambiguous web origin without echoing its value', (origin) => {
+    expect(() =>
+      loadEnvironment({
+        DATABASE_URL: 'postgresql://app:test@localhost:5432/zampayroll',
+        WEB_ORIGIN: origin,
+      }),
+    ).toThrow('WEB_ORIGIN');
+  });
+
   it('rejects an invalid port without echoing unrelated values', () => {
     expect(() =>
       loadEnvironment({
