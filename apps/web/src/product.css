@@ -1165,3 +1165,44 @@ progress {
     display: inline;
   }
 }
+
+.bank-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 24px;
+}
+.bank-selector {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+.bank-selector label {
+  flex: 1;
+  max-width: 520px;
+}
+.bank-source-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+}
+.bank-requirements {
+  padding-left: 22px;
+  max-width: 850px;
+}
+.bank-requirements li {
+  padding: 9px 0 9px 6px;
+  line-height: 1.65;
+}
+@media (max-width: 750px) {
+  .bank-selector {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .bank-selector .badge {
+    align-self: start;
+  }
+}

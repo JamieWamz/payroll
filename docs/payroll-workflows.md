@@ -142,3 +142,29 @@ Evidence reviewed 6 September 2026:
 - [NHIMA regulations, Third Schedule](https://www.nhima.co.zm/download/document/813df761802019102159cc9cc7.pdf), supported by the [NHIMA FAQ](https://www.nhima.co.zm/elementor-1783/).
 
 Reference retrieval writes nothing. Saving creates a draft through the existing authorized API; recorded verification is still required before calculation. The preset never updates existing configurations or finalized snapshots, and never serves as a calculator fallback. Do not extend its dates into 2027 without a new annual review.
+
+## Bank access and statement reconciliation
+
+**Bank batches** now includes Bank access, Salary files and Reconciliation. The
+access guide covers 15 commercial banks with sources and downloadable request
+briefs. The employer must obtain bank onboarding and technical access before live
+payments or automatic statement feeds can be implemented. No bank is connected.
+See [bank research and onboarding](bank-integration-research.md) for the complete
+bank-by-bank findings and requirements.
+
+Reconciliation compares an uploaded, normalized ZMW statement with immutable
+finalized payroll. Download the template, preserve transaction IDs/references,
+use negative debits with two decimal places and select the full statement date
+range. The review flags missing, mismatched and multiple entries, including
+possible reversals, and leaves unrelated entries unmatched. It never infers
+individual payment settlement from a consolidated batch debit. Files are limited
+to 500 KB / 5,000 rows. Results are transient, with a full CSV download; no bank
+confirmation or paid status is recorded. The upload's ownership, authenticity and
+completeness require the operator's review against the original bank statement.
+
+Payment instructions and generated salary-template references now share a stable
+20-character reference per company/period/employee. Previously downloaded files
+retain their original references and need manual matching if already submitted.
+Do not submit a payroll again just to change its reference. The reference is not
+a live bank idempotency implementation. The existing FNB file workflow and
+reviewed custom templates remain manual bank-upload tools.

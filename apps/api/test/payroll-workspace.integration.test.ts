@@ -266,6 +266,10 @@ describe.runIf(url && migrationUrl)(
           201,
         )
       ).json<{ id: string }>().id;
+      expect(
+        (await call('GET', `/payroll-runs/${runId}/banking/instructions`))
+          .statusCode,
+      ).toBe(409);
       const noSalary = await call('POST', `/payroll-runs/${runId}/calculate`, {
         expectedVersion: 1,
       });
@@ -469,6 +473,70 @@ describe.runIf(url && migrationUrl)(
         ),
       ).rejects.toMatchObject({ code: '23514' });
     });
+    it('publishes bank access requirements and reconciles uploads without changing finalized payroll', async () => {
+      const catalog = await success('GET', '/banking/catalog');
+      expect(catalog.json()).toMatchObject({
+        livePaymentsEnabled: false,
+        liveStatementsEnabled: false,
+      });
+      expect(catalog.json().banks).toHaveLength(15);
+      const brief = await success(
+        'GET',
+        '/banking/request-brief?bank=First%20National%20Bank%20Zambia',
+      );
+      expect(brief.body).toContain(
+        'ZamPayroll has not submitted a bank application.',
+      );
+      expect(brief.headers['content-type']).toContain('text/plain');
+      const before = (await success('GET', `/payroll-runs/${runId}`)).body;
+      const expected = await success(
+        'GET',
+        `/payroll-runs/${runId}/banking/instructions`,
+      );
+      const payment = expected.json().items[0];
+      expect(payment).toMatchObject({
+        employeeName: 'Test Employee',
+        amount: '11004.00',
+      });
+      expect(payment.reference).toMatch(/^ZP[A-F0-9]{18}$/);
+      expect(
+        (await success('GET', `/payroll-runs/${runId}/documents/payments`))
+          .body,
+      ).toContain(payment.reference);
+      const payload = {
+        bank: 'First National Bank Zambia',
+        from: '2025-01-01',
+        to: '2025-01-31',
+        csv: `transactionId,bookingDate,reference,amount,currency\n00001,2025-01-31,${payment.reference},-11004.00,ZMW\n00002,2025-01-31,=EVIL(),-5.00,ZMW`,
+      };
+      const review = await success(
+        'POST',
+        `/payroll-runs/${runId}/banking/reconcile`,
+        payload,
+      );
+      expect(review.json()).toMatchObject({
+        mode: 'uploaded_statement_review',
+        summary: { matched: 1, unmatched: 1, missing: 0, exceptions: 0 },
+      });
+      const report = await success(
+        'POST',
+        `/payroll-runs/${runId}/banking/reconcile?format=csv`,
+        payload,
+      );
+      expect(report.body).toContain('matched');
+      expect(report.body).toContain("'=" + 'EVIL()');
+      expect(report.body).toContain('"-11004.00"');
+      const missingCsrf = await app.inject({
+        method: 'POST',
+        url: `${base}/payroll-runs/${runId}/banking/reconcile`,
+        headers: { cookie },
+        payload,
+      });
+      expect(missingCsrf.statusCode).toBe(403);
+      expect((await success('GET', `/payroll-runs/${runId}`)).body).toBe(
+        before,
+      );
+    });
     it('carries forward cumulative PAYE and rejects missing history and overlapping openings', async () => {
       const p = await period('FEB-2025', '2025-02-01', '2025-02-28');
       const run = (
@@ -602,6 +670,25 @@ describe.runIf(url && migrationUrl)(
           })
         ).statusCode,
       ).toBe(403);
+      expect(
+        (
+          await app.inject({
+            method: 'GET',
+            url: `${base}/payroll-runs/${runId}/banking/instructions`,
+            headers: { cookie: secondCookie },
+          })
+        ).statusCode,
+      ).toBe(403);
+      const forgedPath = `/api/companies/${second.companies[0]!.id}/payroll-runs/${runId}/banking/instructions`;
+      expect(
+        (
+          await app.inject({
+            method: 'GET',
+            url: forgedPath,
+            headers: { cookie: secondCookie },
+          })
+        ).statusCode,
+      ).toBe(404);
       await pool.query(
         "DELETE FROM app.role_permissions WHERE company_id=$1 AND permission_key='payroll.finalize'",
         [companyIds[0]],

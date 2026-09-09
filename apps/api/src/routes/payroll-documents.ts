@@ -3,6 +3,7 @@ import {
   renderExportPreview,
 } from '../modules/operations/contracts.js';
 import { randomUUID } from 'node:crypto';
+import { paymentReference } from '../modules/banking/payment-reference.js';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import type {
@@ -28,7 +29,7 @@ import { parse, runParams, loadRun } from './payroll-runs.js';
 import { withAuthorizedCompanyTransaction } from './tenant-authorization.js';
 import { appendSuccessfulAuditEvent } from './audit.js';
 
-async function finalizedEntries(tx: TenantTransaction, runId: string) {
+export async function finalizedEntries(tx: TenantTransaction, runId: string) {
   const loaded = await loadRun(tx, runId);
   if (loaded.run.status !== 'finalized')
     throw new ApiError(
@@ -95,7 +96,7 @@ export const payrollDocumentRoutes: FastifyPluginAsync<{
             accountNumber: i.identity.details.accountNumber,
             bankCode: i.identity.details.bankCode,
             branchCode: i.identity.details.branchCode,
-            reference: `${data.code}-${i.identity.employeeNumber}`,
+            reference: paymentReference(i),
             paymentDate: i.period.paymentDate,
             taxYear: i.period.paymentDate.slice(0, 4),
             taxMonth: i.period.paymentDate.slice(5, 7),

@@ -16,6 +16,7 @@ import { authenticationRoutes } from './routes/authentication.js';
 import { companyWorkforceRoutes } from './routes/company-workforce.js';
 import { compensationRoutes } from './routes/compensation.js';
 import { gratuityPolicyRoutes } from './routes/gratuity-policies.js';
+import { bankingRoutes } from './routes/banking.js';
 import { teamRoutes } from './routes/team.js';
 import { employeeImportRoutes } from './routes/employee-import.js';
 import { workspaceSetupRoutes } from './routes/workspace-setup.js';
@@ -78,6 +79,7 @@ export async function buildApp({
     },
   );
 
+  await app.register(bankingRoutes, { database, environment, prefix: '/api' });
   await app.register(teamRoutes, { database, environment, prefix: '/api' });
   await app.register(employeeImportRoutes, {
     database,

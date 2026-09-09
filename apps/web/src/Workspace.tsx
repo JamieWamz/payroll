@@ -3,6 +3,7 @@ import { message, request, type Session } from './api';
 import { DataTable, EntryForm, Loading, type Field } from './components';
 import { useRemote } from './useRemote';
 import { ExportWorkspace } from './exports';
+import { Banking } from './Banking';
 import { Team } from './Team';
 import { Setup } from './Setup';
 import { Icon } from './Icon';
@@ -280,8 +281,7 @@ function CompanyPage({
         </details>
       </>
     );
-  if (page === 'Bank batches')
-    return <ExportWorkspace {...props} purpose="salary_batch" />;
+  if (page === 'Bank batches') return <Banking {...props} />;
   return <Dashboard {...props} navigate={navigate} />;
 }
 

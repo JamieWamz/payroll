@@ -155,6 +155,7 @@ describe('authenticated payroll workspace', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: /Bank batches/ }),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Salary files' }));
     await screen.findAllByRole('option', { name: 'Salary review' });
     fireEvent.change(screen.getByLabelText('Export template'), {
       target: { value: 'template' },
@@ -487,6 +488,7 @@ describe('authenticated payroll workspace', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: /Bank batches/ }),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Salary files' }));
     expect(await screen.findByText('Not connected')).toBeInTheDocument();
     expect(screen.getByText(/No funds can be sent/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ZRA returns/ }));

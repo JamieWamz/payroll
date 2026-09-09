@@ -452,6 +452,65 @@ test('register, manage employee, calculate, finalize, export, record filing and 
       await nav(name);
       await expect(page.getByRole('alert')).toHaveCount(0);
     }
+    await nav('Bank batches');
+    await expect(
+      page.getByRole('heading', { name: 'Coverage across Zambia' }),
+    ).toBeVisible();
+    await page
+      .getByLabel('Employer’s funding bank')
+      .selectOption('Zambia National Commercial Bank');
+    const briefDownload = page.waitForEvent('download');
+    await page
+      .getByRole('button', { name: 'Download bank request brief' })
+      .click();
+    const bankBrief = await briefDownload;
+    expect(bankBrief.suggestedFilename()).toBe('bank-integration-request.txt');
+    await page.screenshot({
+      path: testInfo.outputPath('bank-access-desktop.png'),
+      fullPage: true,
+    });
+    await page
+      .getByRole('button', { name: 'Reconciliation', exact: true })
+      .click();
+    const paymentRef = page
+      .locator('code')
+      .filter({ hasText: /^ZP[A-F0-9]{18}$/ });
+    await expect(paymentRef).toHaveCount(1);
+    const reference = await paymentRef.innerText();
+    await page.getByLabel('Bank statement CSV').setInputFiles({
+      name: 'test-statement.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(
+        `transactionId,bookingDate,reference,amount,currency\nTEST-BANK-1,2025-01-31,${reference},-10924.00,ZMW\nTEST-FEE-1,2025-01-31,BANK FEE,-10.00,ZMW`,
+      ),
+    });
+    await page
+      .getByRole('button', { name: 'Review statement matches' })
+      .click();
+    await expect(page.getByRole('status')).toContainText(
+      '1 matched · 0 missing · 0 exceptions · 1 unmatched',
+    );
+    const reconciliationDownload = page.waitForEvent('download');
+    await page
+      .getByRole('button', { name: 'Download reconciliation CSV' })
+      .click();
+    expect((await reconciliationDownload).suggestedFilename()).toBe(
+      'statement-reconciliation.csv',
+    );
+    await page.screenshot({
+      path: testInfo.outputPath('bank-reconciliation-desktop.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath('bank-reconciliation-mobile.png'),
+      fullPage: true,
+    });
     await page.setViewportSize({ width: 390, height: 844 });
     await nav('People');
     await expect(

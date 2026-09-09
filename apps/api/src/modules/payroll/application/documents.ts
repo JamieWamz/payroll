@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { paymentReference } from '../../banking/payment-reference.js';
 import type { PreparedInput } from './preparation.js';
 import { money } from './preparation.js';
 import type { PayrollCalculationOutcome } from '../calculation/types.js';
@@ -47,6 +48,7 @@ export function reportCsv(kind: DocumentKind, entries: DocumentEntry[]) {
               'Branch code',
               'Payment date',
               'Net pay (ZMW)',
+              'Payment reference',
             ]
           : [
               ...base,
@@ -94,6 +96,7 @@ export function reportCsv(kind: DocumentKind, entries: DocumentEntry[]) {
         i.identity.details.branchCode,
         i.period.paymentDate,
         amount(o.netPay.minorUnits),
+        paymentReference(i),
       ];
     return [
       ...identity,
