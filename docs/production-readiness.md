@@ -1,8 +1,16 @@
 # Branches and production preparation
 
-The repository uses `feature/*` → `develop` → `main`. `develop` is the working
-integration branch; `main` is the production branch. Fix urgent production issues
-on `hotfix/*` from `main`, then bring the fix into `develop` as well.
+> [!IMPORTANT]
+> [DEPLOYMENT.md](../DEPLOYMENT.md) is the current OCI runbook and database
+> compatibility statement. The existing implementation is PostgreSQL-specific;
+> it cannot safely use Oracle Autonomous AI Database until the documented,
+> separately tested Oracle port is complete.
+
+The repository uses `feature/*` → `development` → `staging` → `main`.
+`development` is the working integration branch, `staging` is the deployed
+test-candidate branch, and `main` is the production branch. Fix urgent
+production issues on `hotfix/*` from `main`, then bring the fix into
+`development` and `staging` as appropriate.
 
 CI runs formatting, lint, types, unit tests, builds, fresh PostgreSQL migrations,
 the complete API integration suite, container readiness checks and the browser
@@ -14,11 +22,13 @@ HTTP test transport; production configuration rejects HTTP and insecure cookies.
 ## Repository administration still required
 
 Branch names and workflow files do not enforce GitHub protection. A repository
-administrator must apply `.github/branch-protection.json` to both `develop` and
-`main`, using GitHub settings or an authenticated GitHub CLI:
+administrator must apply `.github/branch-protection.json` to `development`,
+`staging`, and `main`, using GitHub settings or an authenticated GitHub CLI:
 
 ```sh
-gh api --method PUT repos/JamieWamz/payroll/branches/develop/protection \
+gh api --method PUT repos/JamieWamz/payroll/branches/development/protection \
+  --input .github/branch-protection.json
+gh api --method PUT repos/JamieWamz/payroll/branches/staging/protection \
   --input .github/branch-protection.json
 gh api --method PUT repos/JamieWamz/payroll/branches/main/protection \
   --input .github/branch-protection.json
@@ -31,13 +41,13 @@ needs another reviewer to use that policy. These commands have not been applied
 by this change; SSH push access alone does not provide repository administration.
 
 Create `staging` and `production` GitHub environments before enabling releases.
-Restrict staging to `develop` and production to `main`, and configure production
+Restrict staging to `staging` and production to `main`, and configure production
 reviewers. A workflow referencing a missing environment can create it without
 protection, so the workflow name alone is not an approval gate.
 
 ## Release artifacts
 
-After merging and passing CI, dispatch **Release images** on `develop` or `main`.
+After merging and passing CI, dispatch **Release images** on `staging` or `main`.
 It reruns CI for the selected commit before publishing API, migration and web
 images to GHCR. Tags use the full commit SHA; the job summary records immutable
 SHA-256 image digests. Deploy using those digests. Publication does not deploy a

@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 const environmentSchema = z
   .object({
+    DEPLOYMENT_ENV: z
+      .enum(['development', 'staging', 'production'])
+      .default('development'),
     DATABASE_CONNECTION_TIMEOUT_MS: z.coerce
       .number()
       .int()
@@ -95,6 +98,26 @@ const environmentSchema = z
           message: 'must use HTTPS in production',
         });
       }
+    }
+    if (
+      ['staging', 'production'].includes(environment.DEPLOYMENT_ENV) &&
+      environment.NODE_ENV !== 'production'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['NODE_ENV'],
+        message: 'must be production for staging and production deployments',
+      });
+    }
+    if (
+      environment.NODE_ENV === 'production' &&
+      environment.DEPLOYMENT_ENV === 'development'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DEPLOYMENT_ENV'],
+        message: 'must be staging or production when NODE_ENV is production',
+      });
     }
   })
   .readonly();

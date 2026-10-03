@@ -1,0 +1,37 @@
+# Install as an OCI VM Nginx site after replacing the placeholder domain and
+# certificate paths. The application containers must bind only to 127.0.0.1;
+# this proxy terminates public HTTPS and forwards to the bundled web Nginx.
+#
+# The bundled web service serves the React files and proxies /api to Fastify.
+# No WebSocket route currently exists, so no upgrade headers are required.
+
+server {
+  listen 80;
+  listen [::]:80;
+  server_name staging.example.com payroll.example.com;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  server_name staging.example.com payroll.example.com;
+
+  # Replace these paths with the certificate for the one hostname deployed in
+  # this server block. Keep private keys readable only by the Nginx account.
+  ssl_certificate /etc/letsencrypt/live/REPLACE_WITH_DOMAIN/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/REPLACE_WITH_DOMAIN/privkey.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+
+  client_max_body_size 1m;
+
+  location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Request-Id $request_id;
+  }
+}

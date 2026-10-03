@@ -19,7 +19,7 @@ jobs:
         env:
           RELEASE_BRANCH: ${{ github.ref }}
         run: |
-          [[ "$RELEASE_BRANCH" == refs/heads/main || "$RELEASE_BRANCH" == refs/heads/develop ]]
+          [[ "$RELEASE_BRANCH" == refs/heads/main || "$RELEASE_BRANCH" == refs/heads/staging ]]
 
   verify:
     needs: branch

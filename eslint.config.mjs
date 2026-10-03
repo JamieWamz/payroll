@@ -13,6 +13,9 @@ export default tseslint.config(
       'playwright-report/**',
       '**/dist/**',
       '**/node_modules/**',
+      // Local agent worktrees can contain another complete TypeScript project.
+      // They are not application source and must not affect repository linting.
+      '.kilo/**',
       '**/*.config.js',
     ],
   },

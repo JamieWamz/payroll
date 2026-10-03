@@ -15,6 +15,7 @@ describe('loadEnvironment', () => {
       DATABASE_SSL: false,
       DATABASE_STATEMENT_TIMEOUT_MS: 5_000,
       DATABASE_URL: 'postgresql://app:test@localhost:5432/zampayroll',
+      DEPLOYMENT_ENV: 'development',
       HOST: '127.0.0.1',
       LOG_LEVEL: 'info',
       NODE_ENV: 'development',
@@ -30,6 +31,7 @@ describe('loadEnvironment', () => {
   it('requires HTTPS and secure cookies in production', () => {
     const production = {
       NODE_ENV: 'production',
+      DEPLOYMENT_ENV: 'production',
       DATABASE_URL: 'postgresql://app:test@localhost:5432/zampayroll',
       WEB_ORIGIN: 'https://payroll.example.com',
       SESSION_COOKIE_SECURE: 'true',
@@ -44,6 +46,32 @@ describe('loadEnvironment', () => {
         WEB_ORIGIN: 'http://payroll.example.com',
       }),
     ).toThrow('HTTPS');
+  });
+
+  it('requires staging and production deployment labels to use production mode', () => {
+    const secureDeployment = {
+      DATABASE_URL: 'postgresql://app:test@localhost:5432/zampayroll',
+      WEB_ORIGIN: 'https://staging.example.com',
+      SESSION_COOKIE_SECURE: 'true',
+    };
+
+    expect(() =>
+      loadEnvironment({ ...secureDeployment, DEPLOYMENT_ENV: 'staging' }),
+    ).toThrow('NODE_ENV');
+    expect(() =>
+      loadEnvironment({
+        ...secureDeployment,
+        DEPLOYMENT_ENV: 'development',
+        NODE_ENV: 'production',
+      }),
+    ).toThrow('DEPLOYMENT_ENV');
+    expect(
+      loadEnvironment({
+        ...secureDeployment,
+        DEPLOYMENT_ENV: 'staging',
+        NODE_ENV: 'production',
+      }).DEPLOYMENT_ENV,
+    ).toBe('staging');
   });
 
   it.each([

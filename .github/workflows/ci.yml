@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - main
-      - develop
+      - development
+      - staging
       - 'feature/**'
       - 'hotfix/**'
   pull_request:
     branches:
       - main
-      - develop
+      - development
+      - staging
   workflow_call:
   workflow_dispatch:
 
