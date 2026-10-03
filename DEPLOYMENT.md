@@ -1,37 +1,34 @@
-# OCI deployment status and runbook
+# OCI Compute + Neon deployment runbook
 
-## Current compatibility boundary
+## Deployment architecture
 
 ZamPayroll is deployable today as a Dockerized React/Vite web service plus a
 Fastify API, with the web service proxying `/api` to the API. Its database is
-**PostgreSQL 18**, not Oracle Database. It cannot safely connect to Oracle
-Autonomous AI Database by changing an environment variable:
+PostgreSQL 18, so it is compatible with Neon PostgreSQL without an ORM or SQL
+rewrite. The intended staging and production architecture is:
 
-- the runtime uses the PostgreSQL `pg` driver and PostgreSQL parameter syntax;
-- all 16 versioned migrations use PostgreSQL SQL and `node-pg-migrate`;
-- tenant isolation depends on PostgreSQL row-level security, policies,
-  transaction-local `set_config`, PostgreSQL functions, advisory locks, range
-  types, `jsonb`, `RETURNING`, and PostgreSQL casts.
+```text
+GitHub → OCI Compute VM → Nginx → web/API containers → Neon PostgreSQL
+```
 
-Do not put an Oracle connection string in `DATABASE_URL`; startup intentionally
-rejects it. An Oracle migration is a separate, tested database-port project:
-choose an Oracle Node driver, replace the database adapter and migrations,
-reimplement tenant isolation and locking, migrate a copy of data, and run the
-complete integration suite against an Autonomous AI Database. Until that work
-is complete, the supported OCI database is a separately managed PostgreSQL
-instance, not Oracle Autonomous AI Database.
+The API uses the PostgreSQL `pg` driver, PostgreSQL parameter syntax, and
+versioned `node-pg-migrate` migrations. Tenant isolation relies on PostgreSQL
+row-level security, transaction-local settings, advisory locks, range types,
+`jsonb`, and PostgreSQL functions—all supported by Neon PostgreSQL. No database
+adapter, migration, or payroll business-logic change is required for Neon.
 
-This boundary is deliberate: a partial conversion would weaken tenant isolation
-and could corrupt payroll data.
+Do not use Oracle connection strings in `DATABASE_URL`; the application
+intentionally accepts PostgreSQL URLs only.
 
 ## Environments and branches
 
 Use `feature/*` → `development` → `staging` → `main`.
 
 - `development` is local/integration work and uses `DEPLOYMENT_ENV=development`.
-- `staging` deploys to an isolated staging VM/database and uses
+- `staging` deploys to an isolated staging OCI VM and Neon project/database and uses
   `DEPLOYMENT_ENV=staging`, `NODE_ENV=production`.
-- `main` is the intentional production release branch and uses
+- `main` is the intentional production release branch, OCI VM, and Neon
+  project/database and uses
   `DEPLOYMENT_ENV=production`, `NODE_ENV=production`.
 
 Create the `development` and `staging` branches in GitHub before relying on the
@@ -47,20 +44,44 @@ server with development Node settings. Production mode also rejects an HTTP
 
 ## Local development
 
+Use two terminals. This workflow uses a local Docker PostgreSQL database and
+runs the API/Vite development servers on your host; it has no OCI dependency.
+
+**Terminal 1 — install, configure, and start PostgreSQL**
+
 ```sh
 nvm use
 npm ci
 cp .env.example .env
-# replace only the local placeholder passwords in .env
 npm run db:up
+docker compose --env-file .env -f compose.yaml -f compose.dev.yaml ps postgres
+```
+
+Wait until `postgres` is `healthy`. The sample `.env` values are local-only and
+internally consistent, so they work for a fresh clone. If you change a local
+password, update every local connection URL in `.env` that contains it.
+
+**Terminal 1 — migrate and run the application**
+
+```sh
 npm run db:migrate
 npm run dev
 ```
 
-The host API runs on `HOST`/`PORT`; Vite is at `http://127.0.0.1:5173` and
-proxies `/api` to `API_PROXY_TARGET`. Run `npm test`, `npm run lint`,
-`npm run typecheck`, and `npm run build` before merging. PostgreSQL integration
-tests additionally need `TEST_DATABASE_URL` and `TEST_DATABASE_MIGRATION_URL`.
+Keep that terminal open. The API is at `http://127.0.0.1:3000`; Vite is at
+`http://127.0.0.1:5173` and proxies `/api` to the API.
+
+**Terminal 2 — verify and open the application**
+
+```sh
+curl --fail http://127.0.0.1:5173/api/health/ready
+```
+
+Open <http://127.0.0.1:5173>. Stop the development servers with `Ctrl+C`, then
+run `npm run db:down` to stop PostgreSQL while preserving its data volume. Run
+`npm test`, `npm run lint`, `npm run typecheck`, and `npm run build` before
+merging. PostgreSQL integration tests additionally need `TEST_DATABASE_URL` and
+`TEST_DATABASE_MIGRATION_URL`.
 
 Migration commands are intentionally distinct:
 
@@ -74,11 +95,13 @@ Only use `db:migrate:down` against a disposable development database or during
 a reviewed recovery procedure; it rolls back one migration and can be
 destructive.
 
-## Staging and production configuration
+## Neon staging and production configuration
 
 Do not copy `.env.example` to either environment. Create an ignored, permission
 restricted environment file (or inject values from a secrets manager) per VM
-and per database. Staging and production values must never overlap.
+and per Neon project. Create separate Neon projects for staging and production;
+do not use a production branch or role for staging. Each project needs its own
+database, endpoint, migration role, runtime role, and credentials.
 
 Required application variables:
 
@@ -102,9 +125,35 @@ TRUST_PROXY
 LOG_LEVEL
 ```
 
-`DATABASE_URL` is the least-privileged runtime PostgreSQL role. Keep
-`DATABASE_MIGRATION_URL` separate and provide it only to the one-off migration
-job. This application uses host-only cookies (`Path=/api`, `HttpOnly` for the
+Copy the two connection strings from the corresponding Neon project. They must
+use that project's endpoint and include `sslmode=require`; set
+`DATABASE_SSL=true` so the runtime verifies the server certificate. Set
+`DATABASE_MIGRATION_URL` to the `zampayroll_migrator` role and `DATABASE_URL`
+to the least-privileged `zampayroll_app` role. Never put either connection
+string in GitHub workflow files, image layers, logs, or the frontend build.
+Use Neon’s direct (non-pooled) endpoint for `DATABASE_MIGRATION_URL`; the
+runtime URL may use the Neon pooled endpoint only after it has been verified
+with the application’s transaction and readiness checks.
+
+Before the first migration for each Neon project, connect with the project
+owner connection string and run the supplied role bootstrap script. It creates
+the two required application roles and applies the privileges expected by the
+existing migrations:
+
+```sh
+psql "$NEON_OWNER_DATABASE_URL" \
+  --set=ON_ERROR_STOP=1 \
+  --set=migration_password="$NEON_MIGRATION_ROLE_PASSWORD" \
+  --set=app_password="$NEON_APP_ROLE_PASSWORD" \
+  --file deploy/neon/bootstrap-roles.sql
+```
+
+Keep these shell variables and connection strings out of shell history and CI
+logs. Use the resulting role-specific Neon URLs for the two `DATABASE_*_URL`
+environment variables. The bootstrap is a one-time privileged operation; do
+not give the project-owner URL to the running application.
+
+This application uses host-only cookies (`Path=/api`, `HttpOnly` for the
 session, `SameSite=Strict`); no `COOKIE_DOMAIN` is needed when Nginx serves the
 frontend and API under the same HTTPS origin. Set `WEB_ORIGIN` exactly to that
 origin and set `SESSION_COOKIE_SECURE=true` and `TRUST_PROXY=true` in both
@@ -112,15 +161,15 @@ staging and production.
 
 For the currently supported Docker deployment, bind the API and web services to
 loopback only, run the `migrate` service once with the matching environment,
-then start `api` and `web`. The supplied Compose files include a PostgreSQL
-container for local/CI use; do not use it as an Oracle substitute or expose it
-publicly. For a host-run API, run `npm run build` then
+then start `api` and `web`. The supplied Compose PostgreSQL container is for
+local development/CI only; in staging and production the application connects
+to Neon and no database container is started or exposed. For a host-run API, run `npm run build` then
 `npm start --workspace @zampayroll/api`; use a service manager such as systemd
 to restart that process after crashes. Docker's `restart: unless-stopped` is
 the supplied process-management mechanism for the container deployment.
 
 Install [deploy/nginx/zampayroll.conf.example](deploy/nginx/zampayroll.conf.example)
-on the OCI VM only after replacing its placeholder domain/certificate paths.
+on each OCI VM only after replacing its placeholder domain/certificate paths.
 It redirects HTTP to HTTPS and proxies to the loopback-only web container. The
 web container preserves the original HTTPS forwarding header to Fastify, which
 allows `TRUST_PROXY=true` without downgrading the request scheme internally.
@@ -137,6 +186,8 @@ Before every staging or production release:
 
 - [ ] Pull the correct `staging` or `main` commit/image digest.
 - [ ] Confirm the environment has its own database and secrets.
+- [ ] Confirm `DATABASE_URL` and `DATABASE_MIGRATION_URL` point to the correct
+      Neon project and use TLS.
 - [ ] Back up and verify the current database restore procedure.
 - [ ] Run the one-off migration job with the environment's migration role.
 - [ ] Build or pull the verified API and web images.

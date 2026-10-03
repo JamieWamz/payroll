@@ -1,10 +1,10 @@
 # Branches and production preparation
 
 > [!IMPORTANT]
-> [DEPLOYMENT.md](../DEPLOYMENT.md) is the current OCI runbook and database
-> compatibility statement. The existing implementation is PostgreSQL-specific;
-> it cannot safely use Oracle Autonomous AI Database until the documented,
-> separately tested Oracle port is complete.
+> [DEPLOYMENT.md](../DEPLOYMENT.md) is the current OCI Compute + Neon runbook.
+> The existing PostgreSQL implementation is directly compatible with Neon;
+> staging and production must use separate Neon projects, databases, roles, and
+> credentials.
 
 The repository uses `feature/*` → `development` → `staging` → `main`.
 `development` is the working integration branch, `staging` is the deployed
@@ -60,7 +60,7 @@ been provided. Deployment automation must target that actual environment before
 this system can be called production-ready. Required commissioning work:
 
 - Configure HTTPS ingress, secure cookies and the exact HTTPS `WEB_ORIGIN`.
-  Keep PostgreSQL and the API private. Trust forwarded client addresses only
+  Keep Neon connection strings and the API private. Trust forwarded client addresses only
   behind an ingress that overwrites untrusted headers. Nginx's per-client limit
   uses the trusted upstream `X-Forwarded-For`; do not expose it directly to public
   clients without configuring that boundary. Fastify authentication limits remain active.

@@ -187,97 +187,78 @@ PostgreSQL when the development override is used, and `8080` for the
 containerized web application. Change the matching values in `.env` if a port
 is already in use.
 
-## Initial setup
+## Local development
+
+The normal development setup runs PostgreSQL in Docker, while the API and Vite
+frontend run in your terminal. It does not require any cloud credentials.
+
+### 1. Install and configure
 
 ```sh
 git clone git@github.com:JamieWamz/payroll.git
 cd payroll
-# If Node Version Manager is installed:
-nvm use
+nvm use # if you use Node Version Manager; this project requires Node 24
 npm ci
 cp .env.example .env
 chmod 600 .env
 ```
 
-Before starting PostgreSQL, replace all three example passwords in `.env` and
-update every connection URL that contains them. URL-encode reserved characters
-inside URLs. The checked-in values are development placeholders, not secrets.
-Never put real payroll data or production credentials in this environment.
+The checked-in `.env.example` values are internally consistent, local-only
+placeholders, so a fresh clone can start immediately. They are not production
+secrets and must never be used outside your machine. If you choose different
+local database passwords, update every URL in `.env` that contains that
+password; URL-encode reserved characters.
 
-### Run applications on the host
+### 2. Start the local database
 
-This workflow runs PostgreSQL in Docker and the API and Vite development server
-on the host:
+In the first terminal, start PostgreSQL and wait for it to become healthy:
 
 ```sh
 npm run db:up
 docker compose --env-file .env -f compose.yaml -f compose.dev.yaml ps postgres
+```
+
+The database is ready when the `postgres` service reports `healthy`. If it is
+not healthy, inspect it before continuing:
+
+```sh
+docker compose --env-file .env -f compose.yaml -f compose.dev.yaml logs postgres
+```
+
+### 3. Apply migrations and start the application
+
+Still in the first terminal, initialize/update the local schema and start both
+the API and frontend:
+
+```sh
 npm run db:migrate
 npm run dev
 ```
 
-Wait until PostgreSQL reports `healthy` before running the migration. Open
-<http://127.0.0.1:5173>. Vite proxies `/api` requests to the API at
-<http://127.0.0.1:3000>.
+Leave this terminal running. The API listens at `http://127.0.0.1:3000`; Vite
+serves the frontend at `http://127.0.0.1:5173` and forwards `/api` requests to
+the API.
 
-Stop the application processes with `Ctrl+C`, then stop Compose services while
-preserving the database volume:
+### 4. Verify it works
+
+```sh
+curl --fail http://127.0.0.1:5173/api/health/ready
+```
+
+Then open <http://127.0.0.1:5173>. A successful readiness response contains
+`"status":"ready"`. Login requires a valid workspace invitation; see
+[invitation operations](docs/invite-only-access.md).
+
+### 5. Stop local services
 
 ```sh
 npm run db:down
 ```
 
-### Run on Jamie's current localhost setup
-
-Use these commands for the existing checkout at `/home/jamie/payroll`. This
-machine's payroll PostgreSQL container publishes port `55433`; the API uses
-`3100` to avoid other applications, and the frontend uses `5173`. Dependencies,
-the private `.env` file and database migrations are already set up here.
-These overrides do not modify `.env` or expose its database password.
-
-```sh
-cd /home/jamie/payroll
-
-# Stop the background instance before starting one in this terminal.
-# Skip this line if zampayroll-local.service is not loaded.
-systemctl --user stop zampayroll-local.service
-
-# Use this machine's payroll database.
-export DATABASE_URL="$(node --env-file=.env -e '
-const url = new URL(process.env.COMPOSE_DATABASE_URL);
-url.hostname = "127.0.0.1";
-url.port = "55433";
-process.stdout.write(url.href);
-')"
-
-# Start both frontend and API.
-HOST=127.0.0.1 PORT=3100 \
-WEB_ORIGIN=http://localhost:5173 \
-API_PROXY_TARGET=http://127.0.0.1:3100 \
-SESSION_COOKIE_SECURE=false \
-npm run dev
-```
-
-Open <http://localhost:5173>. Keep the terminal open while using the portal;
-press `Ctrl+C` to stop the frontend and API. The insecure-cookie override is
-only for local HTTP development, not production.
-
-If the existing database container is stopped, start it before `npm run dev`:
-
-```sh
-docker start zampayroll-postgres-1
-```
-
-Wait for PostgreSQL to become healthy. In another terminal, confirm the portal
-can reach both the API and database:
-
-```sh
-curl --fail http://localhost:5173/api/health/ready
-```
-
-A ready system returns `{"service":"zampayroll-api","status":"ready"}`.
-This is a machine-specific alternative to the default host and Compose
-workflows; do not start both on the same ports.
+First stop `npm run dev` with `Ctrl+C`, then run the command above. It stops the
+database containers but preserves the local database volume. Use the same
+setup on the next run; migrations are safe to run again and apply only pending
+versions.
 
 ### Run the complete Compose stack
 
