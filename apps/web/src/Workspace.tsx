@@ -263,7 +263,7 @@ function CompanyPage({
   if (page === 'Team') return <Team {...props} />;
   if (page === 'Setup') return <Setup {...props} navigate={navigate} />;
   if (page === 'People') return <Employees {...props} />;
-  if (page === 'Payroll') return <Payroll {...props} />;
+  if (page === 'Payroll') return <Payroll {...props} navigate={navigate} />;
   if (page === 'Reports') return <Reports {...props} />;
   if (page === 'Settings') return <Settings {...props} />;
   if (page === 'Statutory rules') return <StatutoryRules {...props} />;

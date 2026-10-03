@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { download, request } from './api';
 import { ActionButton, DataTable, EntryForm, Loading } from './components';
 import { useRemote } from './useRemote';
-import type { CompanyProps, Configuration } from './Workspace';
+import type { CompanyProps, Configuration, Page } from './Workspace';
 import {
   currency,
   date,
@@ -11,7 +11,11 @@ import {
   type RunDetail,
 } from './payroll-types';
 
-export function Payroll({ base, csrf }: CompanyProps) {
+export function Payroll({
+  base,
+  csrf,
+  navigate,
+}: CompanyProps & { navigate?: ((page: Page) => void) | undefined }) {
   const [revision, setRevision] = useState(0);
   const [selected, setSelected] = useState('');
   const [create, setCreate] = useState(false);
@@ -26,6 +30,7 @@ export function Payroll({ base, csrf }: CompanyProps) {
         base={base}
         csrf={csrf}
         runId={selected}
+        navigate={navigate}
         back={() => {
           setSelected('');
           setRevision((v) => v + 1);
@@ -219,7 +224,12 @@ function PayrollReview({
   csrf,
   runId,
   back,
-}: CompanyProps & { runId: string; back: () => void }) {
+  navigate,
+}: CompanyProps & {
+  runId: string;
+  back: () => void;
+  navigate?: ((page: Page) => void) | undefined;
+}) {
   const [revision, setRevision] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
   const [employee, setEmployee] = useState('');
@@ -466,6 +476,19 @@ function PayrollReview({
             Open Reports for statutory schedules, and ZRA returns to record
             external filing references.
           </p>
+          {navigate && (
+            <div className="button-row" style={{ marginTop: '0.75rem' }}>
+              <button type="button" className="secondary" onClick={() => navigate('Bank batches')}>
+                Bank Batches & Payments →
+              </button>
+              <button type="button" className="secondary" onClick={() => navigate('ZRA returns')}>
+                ZRA Tax Returns →
+              </button>
+              <button type="button" className="secondary" onClick={() => navigate('Reports')}>
+                Statutory Reports →
+              </button>
+            </div>
+          )}
         </>
       )}
     </>

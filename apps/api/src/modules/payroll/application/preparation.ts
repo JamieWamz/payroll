@@ -207,6 +207,9 @@ export async function prepareInputs(
       );
     let taxable = 0n;
     let paye = 0n;
+    let napsaEmployee = 0n;
+    let napsaEmployer = 0n;
+    let napsaEarnings = 0n;
     let contextStart = `${year}-01-01`;
     if (details.openingAsOf) {
       const d = parseLocalDate(details.openingAsOf);
@@ -231,6 +234,21 @@ export async function prepareInputs(
         ).minorUnits;
         paye = parseDecimalMoney(
           details.openingPaye,
+          parseCurrencyCode('ZMW'),
+          2,
+        ).minorUnits;
+        napsaEmployee = parseDecimalMoney(
+          details.openingNapsaEmployee,
+          parseCurrencyCode('ZMW'),
+          2,
+        ).minorUnits;
+        napsaEmployer = parseDecimalMoney(
+          details.openingNapsaEmployer,
+          parseCurrencyCode('ZMW'),
+          2,
+        ).minorUnits;
+        napsaEarnings = parseDecimalMoney(
+          details.openingNapsaEarnings,
           parseCurrencyCode('ZMW'),
           2,
         ).minorUnits;
@@ -266,6 +284,10 @@ export async function prepareInputs(
       const previous = decode<PayrollCalculationOutcome>(h.outcome);
       taxable += previous.taxableIncome.minorUnits;
       paye += previous.paye.minorUnits;
+      napsaEmployee += previous.napsa.minorUnits;
+      napsaEmployer += previous.employerContributions.find(c => c.code === 'NAPSA-EMPLOYER')?.amount.minorUnits ?? 0n;
+      // Use gross pay as NAPSA earnings proxy (correct when BASE_SALARY is the sole NAPSA component)
+      napsaEarnings += previous.grossPay.minorUnits;
     }
     if (paye < 0n)
       throw new ApiError(
@@ -301,9 +323,9 @@ export async function prepareInputs(
       statutoryContext: {
         taxableIncomeBeforePeriod: money(taxable),
         payeBeforePeriod: money(paye),
-        napsaEmployeeContributionBeforePeriod: money(0n),
-        napsaEmployerContributionBeforePeriod: money(0n),
-        napsaEarningsBeforePeriod: money(0n),
+        napsaEmployeeContributionBeforePeriod: money(napsaEmployee),
+        napsaEmployerContributionBeforePeriod: money(napsaEmployer),
+        napsaEarningsBeforePeriod: money(napsaEarnings),
       },
       compensation: all.map((c) => ({
         componentId: parseEntityId(c.id, 'CompensationComponent'),

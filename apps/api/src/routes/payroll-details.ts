@@ -34,6 +34,9 @@ export const employeePayrollDetailsSchema = z
     openingAsOf: z.string().max(10).default(''),
     openingTaxableIncome: amount.default('0.00'),
     openingPaye: amount.default('0.00'),
+    openingNapsaEmployee: amount.default('0.00'),
+    openingNapsaEmployer: amount.default('0.00'),
+    openingNapsaEarnings: amount.default('0.00'),
   })
   .strict();
 export type EmployeePayrollDetails = z.infer<

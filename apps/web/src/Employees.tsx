@@ -610,11 +610,14 @@ function EmployeeDetails({
       ],
     },
     {
-      title: 'Opening tax balances',
+      title: 'Opening statutory & tax balances',
       fields: [
         ['openingAsOf', 'Balances through'],
         ['openingTaxableIncome', 'Taxable income to date (ZMW)'],
         ['openingPaye', 'PAYE deducted to date (ZMW)'],
+        ['openingNapsaEmployee', 'NAPSA employee contribution to date (ZMW)'],
+        ['openingNapsaEmployer', 'NAPSA employer contribution to date (ZMW)'],
+        ['openingNapsaEarnings', 'NAPSA subject earnings to date (ZMW)'],
       ],
     },
   ];
@@ -628,7 +631,12 @@ function EmployeeDetails({
           fields={group.fields.map(([name, label]) => ({
             name: name!,
             label: label!,
-            optional: name !== 'openingTaxableIncome' && name !== 'openingPaye',
+            optional:
+              name !== 'openingTaxableIncome' &&
+              name !== 'openingPaye' &&
+              name !== 'openingNapsaEmployee' &&
+              name !== 'openingNapsaEmployer' &&
+              name !== 'openingNapsaEarnings',
             defaultValue: data.details[name!] ?? '',
             ...(name === 'openingAsOf'
               ? {

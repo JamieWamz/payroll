@@ -19,6 +19,12 @@ export const employeeImportColumns = [
   'accountNumber',
   'branchCode',
   'bankCode',
+  'openingAsOf',
+  'openingTaxableIncome',
+  'openingPaye',
+  'openingNapsaEmployee',
+  'openingNapsaEmployer',
+  'openingNapsaEarnings',
 ] as const;
 export { parseCsv } from '../../../shared/csv.js';
 export function prepareEmployeeImport(companyId: string, source: string) {
