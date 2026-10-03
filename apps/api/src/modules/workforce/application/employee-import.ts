@@ -85,7 +85,10 @@ export function prepareEmployeeImport(companyId: string, source: string) {
       });
       const parsed = employeePayrollDetailsSchema.safeParse(
         Object.fromEntries(
-          employeeImportColumns.slice(6).map((k) => [k, raw[k] ?? '']),
+          employeeImportColumns
+            .slice(6)
+            .map((k) => [k, raw[k] || undefined])
+            .filter(([, v]) => v !== undefined),
         ),
       );
       if (!parsed.success)
