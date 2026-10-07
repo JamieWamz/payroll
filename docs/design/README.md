@@ -14,10 +14,12 @@ The implementation uses ink navy, warm white and a restrained copper accent.
 The references informed hierarchy and layout; their artwork, names, sample
 financial data and identity providers are not included in the application.
 
-The new design includes invitation-only account activation, password visibility, browser autofill,
-company setup based on saved records, grouped navigation, role-aware page access,
-consistent tables/forms and layouts for desktop and mobile. Existing authenticated
-session, CSRF and company authorization contracts remain authoritative.
+The new design includes self-service workspace creation, optional invitation
+activation, password visibility, browser autofill, profile editing, a persistent
+light/dark preference, company setup based on saved records, grouped navigation,
+role-aware page access, and consistent tables/forms for desktop and mobile.
+Existing authenticated session, CSRF and company authorization contracts remain
+authoritative.
 
 The [Wamz Technologies identity](wamz-identity.md) provides the minimal parent-brand
 endorsement beneath ZamPayroll, with an editable Canva design and locally served SVG.

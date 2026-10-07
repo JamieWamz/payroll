@@ -1,11 +1,16 @@
-# Invite-only access
+# Account and invitation access
 
-New company accounts require an invitation issued by the deployment operator.
-There is no public signup switch, including in development and tests. Company
-owners can invite staff into their existing company from Team; they cannot
-issue new workspace invitations or create another company without approval.
+Customers can create their company workspace and its first owner account from
+the sign-in page. This creation flow uses the same atomic, audited ownership
+provisioning as the assisted invitation flow. It is throttled, validates an
+Argon2id-protected passphrase, and rejects duplicate email addresses or company
+codes.
 
-## Issue a company invitation
+Company owners invite staff into their existing company from Team. An operator
+may still issue a workspace invitation for assisted onboarding, for example
+when the company details and owner email must be pre-agreed.
+
+## Optional assisted workspace invitation
 
 After reviewing the customer and commercial agreement, run this from a trusted
 operator checkout with `DATABASE_MIGRATION_URL` set to the migration connection
@@ -50,13 +55,11 @@ and enters their name and password. New users choose a passphrase of at least
 cannot reset or take over an existing account. Existing memberships are retained.
 Successful acceptance signs in the owner and opens Setup.
 
-The API rejects `/api/auth/register` without an invitation, independently of the
-UI. PostgreSQL also denies the runtime role direct execution of the original
-unrestricted registration function. Acceptance locks the invitation row and
-creates the account, company, permissions and acceptance event in one transaction.
-Staff invitations continue to use `/#invite=…` and the company's authorized Team flow.
+`/api/auth/register` provisions a new account/company owner when no invitation
+token is supplied. When a valid workspace invitation is supplied, acceptance
+locks the invitation row and creates the account, company, permissions and
+acceptance event in one transaction. Staff invitations continue to use
+`/#invite=…` and the company's authorized Team flow.
 
-Apply the invitation migration before starting the new API. The previous API's
-public registration stops working after the migration. Do not roll this migration
-back in production: its Down section restores the old registration capability.
-Use reviewed forward migrations for recovery. Existing accounts continue to sign in.
+Apply all versioned migrations before starting the API. Use reviewed forward
+migrations for recovery. Existing accounts continue to sign in.

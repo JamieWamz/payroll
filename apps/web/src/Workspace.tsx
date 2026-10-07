@@ -13,6 +13,8 @@ import { Payroll } from './Payroll';
 import { Dashboard } from './Dashboard';
 import { Reports, Filings } from './Reports';
 import { Settings, StatutoryRules } from './Settings';
+import type { Theme } from './ThemeToggle';
+import { ThemeToggle } from './ThemeToggle';
 
 const pages = [
   'Overview',
@@ -72,9 +74,15 @@ export interface CompanyProps {
 export function Workspace({
   session,
   onLogout,
+  onSessionUpdated,
+  theme,
+  toggleTheme,
 }: {
   session: Session;
   onLogout: () => void;
+  onSessionUpdated: (session: Session) => void;
+  theme: Theme;
+  toggleTheme: () => void;
 }) {
   const [companyId, setCompanyId] = useState(session.companies[0]?.id ?? '');
   const [page, setPage] = useState<Page>(() => readPage());
@@ -111,6 +119,10 @@ export function Workspace({
   };
   const [error, setError] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState(session.user.displayName);
+  const [profileError, setProfileError] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
   const company = session.companies.find((item) => item.id === companyId);
   return (
     <div className="workspace">
@@ -180,6 +192,59 @@ export function Workspace({
           </div>
           <strong>{session.user.displayName}</strong>
           <small>{session.user.email}</small>
+          <ThemeToggle theme={theme} toggle={toggleTheme} />
+          <button
+            className="text-button account-profile-trigger"
+            onClick={() => {
+              setEditingProfile((current) => !current);
+              setProfileName(session.user.displayName);
+              setProfileError('');
+            }}
+          >
+            {editingProfile ? 'Close profile' : 'Edit profile'}
+          </button>
+          {editingProfile && (
+            <form
+              className="account-profile-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (savingProfile) return;
+                setSavingProfile(true);
+                setProfileError('');
+                void request<Session>('/auth/profile', {
+                  body: { displayName: profileName },
+                  csrf: session.csrfToken,
+                  method: 'PATCH',
+                })
+                  .then((updated) => {
+                    onSessionUpdated(updated);
+                    setEditingProfile(false);
+                  })
+                  .catch((failure: unknown) =>
+                    setProfileError(message(failure)),
+                  )
+                  .finally(() => setSavingProfile(false));
+              }}
+            >
+              <label htmlFor="account-display-name">Your name</label>
+              <input
+                id="account-display-name"
+                autoComplete="name"
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+                required
+                maxLength={120}
+              />
+              {profileError && (
+                <p className="notice error" role="alert">
+                  {profileError}
+                </p>
+              )}
+              <button type="submit" disabled={savingProfile}>
+                {savingProfile ? 'Saving…' : 'Save profile'}
+              </button>
+            </form>
+          )}
           <button
             className="secondary"
             disabled={loggingOut}

@@ -10,6 +10,8 @@ const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const testDatabaseMigrationUrl = process.env.TEST_DATABASE_MIGRATION_URL;
 const fixtureEmail = 'owner.auth-route@example.com';
 const fixtureCompanyCode = 'auth-route-company';
+const selfServiceEmail = 'self-service.auth-route@example.com';
+const selfServiceCompanyCode = 'self-service-auth-route-company';
 const validPassword = 'Correct horse battery staple 2026!';
 
 describe.runIf(
@@ -65,6 +67,26 @@ describe.runIf(
     expect(response.json()).toMatchObject({ error: 'DomainError' });
   });
 
+  it('lets a customer create their first workspace without an invitation', async () => {
+    const registration = await requireApp().inject({
+      method: 'POST',
+      payload: {
+        companyCode: selfServiceCompanyCode,
+        companyName: 'Self Service Route Company',
+        displayName: 'Self Service Owner',
+        email: selfServiceEmail,
+        password: validPassword,
+      },
+      url: '/api/auth/register',
+    });
+
+    expect(registration.statusCode).toBe(201);
+    expect(registration.json()).toMatchObject({
+      companies: [{ code: selfServiceCompanyCode }],
+      user: { email: selfServiceEmail },
+    });
+  });
+
   it('registers, restores a session, enforces CSRF, logs out, and logs in', async () => {
     const registration = await requireApp().inject({
       method: 'POST',
@@ -97,6 +119,23 @@ describe.runIf(
          WHERE company.code = '${fixtureCompanyCode}') AS "permissionCount"
     `);
     expect(stored.rows).toEqual([{ auditCount: '2', permissionCount: '13' }]);
+
+    const profile = await requireApp().inject({
+      headers: {
+        cookie: registeredCookies.header,
+        'x-csrf-token': registrationCsrf,
+      },
+      method: 'PATCH',
+      payload: { displayName: 'Updated Route Owner' },
+      url: '/api/auth/profile',
+    });
+    expect(profile.statusCode).toBe(200);
+    expect(profile.json()).toMatchObject({
+      user: {
+        displayName: 'Updated Route Owner',
+        email: fixtureEmail,
+      },
+    });
 
     const duplicate = await requireApp().inject({
       method: 'POST',
@@ -205,12 +244,12 @@ async function cleanFixture(pool: Pool): Promise<void> {
   try {
     await client.query('BEGIN');
     const account = await client.query<{ id: string }>(
-      'SELECT id FROM app.user_accounts WHERE email = $1',
-      [fixtureEmail],
+      'SELECT id FROM app.user_accounts WHERE email = ANY($1::text[])',
+      [[fixtureEmail, selfServiceEmail]],
     );
     const company = await client.query<{ id: string }>(
-      'SELECT id FROM app.companies WHERE code = $1',
-      [fixtureCompanyCode],
+      'SELECT id FROM app.companies WHERE code = ANY($1::text[])',
+      [[fixtureCompanyCode, selfServiceCompanyCode]],
     );
     const userIds = account.rows.map((row) => row.id);
     const companyIds = company.rows.map((row) => row.id);

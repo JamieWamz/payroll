@@ -20,8 +20,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('invitation-only access', () => {
-  it('shows sign-in and the Wamz endorsement without a public signup action', async () => {
+describe('account access', () => {
+  it('shows sign-in and lets a customer begin workspace creation', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => json({ message: 'Authentication is required' }, 401)),
@@ -31,15 +31,64 @@ describe('invitation-only access', () => {
       await screen.findByRole('heading', { name: 'Welcome back.' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Access is by invitation only/),
+      screen.getByRole('button', { name: 'Create your workspace' }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /Create.*(workspace|account)/ }),
-    ).not.toBeInTheDocument();
     expect(screen.getByAltText('Wamz Technologies')).toHaveAttribute(
       'src',
       '/brand/wamz-technologies.svg',
     );
+  });
+  it('submits a self-service workspace registration', async () => {
+    const session = {
+      companies: [],
+      csrfToken: 'test',
+      user: { id: 'test', email: 'owner@example.com', displayName: 'Owner' },
+    };
+    const fetcher = vi.fn(async (url: string) =>
+      json(
+        url.endsWith('/auth/session')
+          ? { message: 'Authentication is required' }
+          : session,
+        url.endsWith('/auth/session') ? 401 : 200,
+      ),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    render(<App />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Create your workspace' }),
+    );
+    fireEvent.change(screen.getByLabelText('Your name'), {
+      target: { value: 'Owner' },
+    });
+    fireEvent.change(screen.getByLabelText('Company name'), {
+      target: { value: 'Owner Payroll' },
+    });
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'owner@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'Correct horse battery staple 2026!' },
+    });
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'Correct horse battery staple 2026!' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await waitFor(() =>
+      expect(fetcher).toHaveBeenCalledWith(
+        '/api/auth/register',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+    const call = (
+      fetcher.mock.calls as unknown as [string, RequestInit][]
+    ).find(([url]) => url.endsWith('/auth/register'));
+    expect(JSON.parse(call![1].body as string)).toEqual({
+      companyCode: 'owner-payroll',
+      companyName: 'Owner Payroll',
+      displayName: 'Owner',
+      email: 'owner@example.com',
+      password: 'Correct horse battery staple 2026!',
+    });
   });
   it('accepts only the displayed company and email from the workspace invitation', async () => {
     const token = 'a'.repeat(43);

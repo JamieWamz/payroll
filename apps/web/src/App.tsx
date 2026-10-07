@@ -4,9 +4,17 @@ import { JoinCompany } from './JoinCompany';
 import { ActivateWorkspace } from './ActivateWorkspace';
 import { AuthScreen } from './AuthScreen';
 import { Workspace } from './Workspace';
+import type { Theme } from './ThemeToggle';
 import './styles.css';
 import './product.css';
 export function App() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = window.localStorage.getItem('zampayroll-theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  });
   const [workspaceToken, setWorkspaceToken] = useState(
     () =>
       /^#workspace-invite=([A-Za-z0-9_-]{43})$/.exec(
@@ -34,6 +42,13 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState('');
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('zampayroll-theme', theme);
+  }, [theme]);
+  const toggleTheme = () => {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
+  };
   useEffect(() => {
     const controller = new AbortController();
     void request<Session>('/auth/session', { signal: controller.signal })
@@ -101,10 +116,20 @@ export function App() {
       </main>
     );
   if (session)
-    return <Workspace session={session} onLogout={() => setSession(null)} />;
+    return (
+      <Workspace
+        session={session}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        onLogout={() => setSession(null)}
+        onSessionUpdated={setSession}
+      />
+    );
   return (
     <AuthScreen
       error={error}
+      theme={theme}
+      toggleTheme={toggleTheme}
       onAuthenticated={(value) => {
         setError('');
         setSession(value);

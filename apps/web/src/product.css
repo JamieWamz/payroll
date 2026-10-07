@@ -1054,6 +1054,148 @@ progress {
     flex-direction: column;
   }
 }
+
+.access-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+.sidebar-bottom .theme-toggle,
+.account-profile-trigger,
+.account-profile-form {
+  grid-column: 1 / -1;
+}
+.sidebar-bottom .theme-toggle {
+  width: 100%;
+  margin-top: 14px;
+}
+.account-profile-trigger {
+  justify-self: start;
+  margin-top: 5px;
+  min-height: 30px;
+  font-size: 0.76rem;
+}
+.account-profile-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.account-profile-form label {
+  font-size: 0.75rem;
+}
+.account-profile-form input {
+  margin: 0;
+  min-height: 38px;
+}
+.account-profile-form button {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.76rem;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ink: #dbe9f8;
+  --ink-hover: #ffffff;
+  --paper: #101923;
+  --copper-light: #f0ba93;
+  --line: #2a3a4d;
+  --muted: #adbbca;
+  color: #e8eff7;
+  background: #101923;
+}
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] .main-content,
+:root[data-theme='dark'] .access-panel {
+  background: #101923;
+  color: #e8eff7;
+}
+:root[data-theme='dark'] .sidebar,
+:root[data-theme='dark'] .card,
+:root[data-theme='dark'] .attention-panel,
+:root[data-theme='dark'] .setup-heading,
+:root[data-theme='dark'] .setup-prompt,
+:root[data-theme='dark'] .workspace-header > .badge,
+:root[data-theme='dark'] .company-switch,
+:root[data-theme='dark'] input,
+:root[data-theme='dark'] select,
+:root[data-theme='dark'] textarea,
+:root[data-theme='dark'] button.secondary,
+:root[data-theme='dark'] .secondary {
+  background: #172332;
+  border-color: #34475d;
+  color: #e8eff7;
+}
+:root[data-theme='dark'] .access-shell {
+  background: #101923;
+}
+:root[data-theme='dark'] .sidebar nav button,
+:root[data-theme='dark'] .text-button,
+:root[data-theme='dark'] a,
+:root[data-theme='dark'] .company-switch select {
+  color: #c9dcf0;
+}
+:root[data-theme='dark'] .sidebar nav button:hover,
+:root[data-theme='dark'] .text-button:hover,
+:root[data-theme='dark'] button.secondary:hover,
+:root[data-theme='dark'] .secondary:hover,
+:root[data-theme='dark'] .task-row:hover {
+  background: #223247;
+  color: #ffffff;
+}
+:root[data-theme='dark'] p,
+:root[data-theme='dark'] small,
+:root[data-theme='dark'] .muted,
+:root[data-theme='dark'] .access-footer,
+:root[data-theme='dark'] .access-alternative {
+  color: #adbbca;
+}
+:root[data-theme='dark'] th,
+:root[data-theme='dark'] .empty,
+:root[data-theme='dark'] .bank-grid > div {
+  background: #1c2a3a;
+  color: #c9dcf0;
+}
+:root[data-theme='dark'] td,
+:root[data-theme='dark'] th,
+:root[data-theme='dark'] .empty,
+:root[data-theme='dark'] .resource-row,
+:root[data-theme='dark'] .column-editor {
+  border-color: #2a3a4d;
+}
+:root[data-theme='dark'] .user-avatar {
+  background: #3d2c31;
+  color: #ffd9bb;
+}
+:root[data-theme='dark'] .badge,
+:root[data-theme='dark'] .company-switch {
+  background: #223247;
+  color: #c9dcf0;
+}
+:root[data-theme='dark'] .notice {
+  background: #243346;
+  border-color: #405875;
+  color: #d6e4f2;
+}
+:root[data-theme='dark'] .notice.error,
+:root[data-theme='dark'] .action-error {
+  background: #482d32;
+  border-color: #7d454e;
+  color: #ffd3d7;
+}
 @media (prefers-reduced-motion: reduce) {
   button {
     transition: none;

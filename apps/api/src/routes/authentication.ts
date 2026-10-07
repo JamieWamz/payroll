@@ -93,14 +93,6 @@ export const authenticationRoutes: FastifyPluginAsync<
     { config: { rateLimit: { max: 3, timeWindow: '1 minute' } } },
     async (request, reply) => {
       const body = parseBody(registrationSchema, request.body);
-      if (!body.inviteToken)
-        throw new ApiError(
-          403,
-          'Company accounts are invitation-only. Use the invitation link provided by ZamPayroll.',
-        );
-      const digest = digestSecurityToken(
-        parseOpaqueSecurityToken(body.inviteToken),
-      );
       const userAccountId = randomUUID();
       const companyId = randomUUID();
       const membershipId = randomUUID();
@@ -116,6 +108,73 @@ export const authenticationRoutes: FastifyPluginAsync<
         name: body.companyName,
       });
       const session = createNewSession(options.environment);
+
+      if (!body.inviteToken) {
+        try {
+          const passwordHash = await hashPassword(
+            await validateNewPassword(body.password, passwordBlocklist),
+          );
+          const authenticated = await options.database.withSystemTransaction(
+            async (transaction) => {
+              const existing = await findAuthenticationRecord(
+                transaction,
+                user.email,
+              );
+              if (existing !== undefined)
+                throw new ApiError(
+                  409,
+                  'An account already exists for this email. Sign in instead.',
+                );
+
+              await transaction.query(
+                `SELECT app.register_company_owner(
+                   $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+                 )`,
+                [
+                  user.id,
+                  company.id,
+                  membershipId,
+                  roleId,
+                  user.email,
+                  user.displayName,
+                  company.code,
+                  company.name,
+                  passwordHash,
+                  randomUUID(),
+                  request.id,
+                  null,
+                ],
+              );
+              await persistSession(transaction, user.id, session, request.id);
+              return {
+                memberships: await findMemberships(transaction, user.id),
+                user,
+              };
+            },
+          );
+          setAuthenticationCookies(reply, options.environment, session);
+          return reply
+            .status(201)
+            .header('cache-control', 'no-store')
+            .send({
+              companies: serializeMemberships(authenticated.memberships),
+              csrfToken: session.secrets.csrfToken,
+              user: {
+                displayName: authenticated.user.displayName,
+                email: authenticated.user.email,
+                id: authenticated.user.id,
+              },
+            });
+        } catch (error) {
+          if (isPostgresError(error, '23505'))
+            throw new ApiError(409, 'Account or company already exists');
+          throw error;
+        }
+      }
+
+      const digest = digestSecurityToken(
+        parseOpaqueSecurityToken(body.inviteToken),
+      );
       let authenticated;
       try {
         authenticated = await options.database.withSystemTransaction(
@@ -404,6 +463,75 @@ export const authenticationRoutes: FastifyPluginAsync<
       },
     });
   });
+
+  app.patch(
+    '/auth/profile',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const body = parseBody(
+        z.object({ displayName: z.string().max(240) }).strict(),
+        request.body,
+      );
+      const token = request.cookies[sessionCookieName];
+      const csrfCookie = request.cookies[csrfCookieName];
+      const csrfHeader = readSingleHeader(request.headers['x-csrf-token']);
+      const authenticated = await resolveSession(
+        options.database,
+        options.environment,
+        token,
+      );
+
+      if (
+        authenticated === undefined ||
+        csrfCookie === undefined ||
+        csrfHeader === undefined ||
+        csrfCookie !== csrfHeader ||
+        !securityTokenMatchesDigest(
+          csrfHeader,
+          parseSecurityTokenDigest(authenticated.session.csrfTokenDigest),
+        )
+      ) {
+        throw new ApiError(403, 'CSRF validation failed');
+      }
+
+      const user = createUserAccount({
+        displayName: body.displayName,
+        email: authenticated.session.email,
+        id: authenticated.session.userAccountId,
+      });
+      const updated = await options.database.withSystemTransaction(
+        async (transaction) =>
+          (
+            await transaction.query<{
+              displayName: string;
+              email: string;
+              id: string;
+            }>(
+              `SELECT
+                 user_account_id AS id,
+                 email,
+                 display_name AS "displayName"
+               FROM app.update_authenticated_profile($1, $2, $3, $4)`,
+              [
+                digestSecurityToken(parseOpaqueSecurityToken(token!)),
+                user.displayName,
+                randomUUID(),
+                request.id,
+              ],
+            )
+          ).rows[0],
+      );
+
+      if (updated === undefined)
+        throw new ApiError(401, 'Authentication is required');
+
+      return reply.header('cache-control', 'no-store').send({
+        companies: serializeMemberships(authenticated.memberships),
+        csrfToken: csrfCookie,
+        user: updated,
+      });
+    },
+  );
 
   app.post(
     '/auth/invitation',

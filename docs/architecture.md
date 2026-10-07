@@ -1,8 +1,9 @@
 # ZamPayroll Architecture
 
-Current account provisioning is operator-controlled and invitation-only. See
-[invite-only access](invite-only-access.md) for the API, database and operational
-boundaries; this supersedes the original public-registration design below.
+Customers can self-register an owner account and their first workspace. Company
+owners invite staff, while an operator-issued workspace invitation remains
+available for assisted onboarding. See [account and invitation access](invite-only-access.md)
+for the API, database and operational boundaries.
 
 ## Status and scope
 
