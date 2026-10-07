@@ -10,6 +10,7 @@ import { createPayrollPeriod } from '../modules/payroll/domain/payroll-period.js
 import {
   createDraftPayrollRun,
   calculatePayrollRun,
+  approvePayrollRun,
   finalizePayrollRun,
   type PayrollRun,
 } from '../modules/payroll/domain/payroll-run.js';
@@ -55,11 +56,13 @@ interface RunRow {
   companyId: string;
   payrollPeriodId: string;
   statutoryConfigurationId: string;
-  status: 'draft' | 'calculated' | 'finalized';
+  status: 'draft' | 'calculated' | 'approved' | 'finalized';
   createdAt: Date;
   createdBy: string;
   calculatedAt: Date | null;
   calculatedBy: string | null;
+  approvedAt: Date | null;
+  approvedBy: string | null;
   finalizedAt: Date | null;
   finalizedBy: string | null;
   cancelledAt: Date | null;
@@ -78,7 +81,7 @@ export interface RunEmployeeRow {
   input: unknown;
   outcome: unknown;
 }
-const selectRun = `SELECT r.id, r.company_id AS "companyId", r.payroll_period_id AS "payrollPeriodId", r.statutory_configuration_id AS "statutoryConfigurationId", r.status, r.created_at AS "createdAt", r.created_by_membership_id AS "createdBy", r.calculated_at AS "calculatedAt", r.calculated_by_membership_id AS "calculatedBy", r.finalized_at AS "finalizedAt", r.finalized_by_membership_id AS "finalizedBy", r.row_version::text AS version, r.cancelled_at AS "cancelledAt", r.cancellation_reason AS "cancellationReason", p.code, p.starts_on::text AS "startsOn", p.ends_on::text AS "endsOn", p.payment_date::text AS "paymentDate", p.kind FROM app.payroll_runs r JOIN app.payroll_periods p ON p.company_id = r.company_id AND p.id = r.payroll_period_id WHERE r.company_id = app.current_company_id()`;
+const selectRun = `SELECT r.id, r.company_id AS "companyId", r.payroll_period_id AS "payrollPeriodId", r.statutory_configuration_id AS "statutoryConfigurationId", r.status, r.created_at AS "createdAt", r.created_by_membership_id AS "createdBy", r.calculated_at AS "calculatedAt", r.calculated_by_membership_id AS "calculatedBy", r.approved_at AS "approvedAt", r.approved_by_membership_id AS "approvedBy", r.finalized_at AS "finalizedAt", r.finalized_by_membership_id AS "finalizedBy", r.row_version::text AS version, r.cancelled_at AS "cancelledAt", r.cancellation_reason AS "cancellationReason", p.code, p.starts_on::text AS "startsOn", p.ends_on::text AS "endsOn", p.payment_date::text AS "paymentDate", p.kind FROM app.payroll_runs r JOIN app.payroll_periods p ON p.company_id = r.company_id AND p.id = r.payroll_period_id WHERE r.company_id = app.current_company_id()`;
 export async function loadRun(tx: TenantTransaction, id: string) {
   const record = (await tx.query<RunRow>(`${selectRun} AND r.id = $1`, [id]))
     .rows[0];
@@ -121,6 +124,16 @@ export async function loadRun(tx: TenantTransaction, id: string) {
               input: decode<PreparedInput>(e.input),
               outcome: decode<PayrollCalculationOutcome>(e.outcome),
             })),
+          }
+        : undefined,
+    approval:
+      record.approvedAt && record.approvedBy
+        ? {
+            approvedAt: parseInstant(record.approvedAt.toISOString()),
+            approvedByMembershipId: parseEntityId(
+              record.approvedBy,
+              'CompanyMembership',
+            ),
           }
         : undefined,
     finalization:
@@ -456,7 +469,7 @@ export const payrollRunRoutes: FastifyPluginAsync<{
           if (record.status === 'finalized' || record.cancelledAt)
             throw new ApiError(
               409,
-              'Only an active draft or calculated payroll can be cancelled.',
+              'Only an active draft, calculated or approved payroll can be cancelled.',
             );
           if (Number(record.version) !== body.expectedVersion)
             throw new ApiError(
@@ -479,7 +492,7 @@ export const payrollRunRoutes: FastifyPluginAsync<{
         .send({ id: runId, cancelled: true });
     },
   );
-  for (const action of ['calculate', 'finalize'] as const) {
+  for (const action of ['calculate', 'approve', 'finalize'] as const) {
     app.post(
       `/companies/:companyId/payroll-runs/:runId/${action}`,
       async (request, reply) => {
@@ -500,7 +513,7 @@ export const payrollRunRoutes: FastifyPluginAsync<{
             environment: options.environment,
             request,
             permission:
-              action === 'finalize' ? 'payroll.finalize' : 'payroll.calculate',
+              action === 'calculate' ? 'payroll.calculate' : 'payroll.finalize',
             requireCsrf: true,
           },
           async (tx, principal) => {
@@ -542,7 +555,7 @@ export const payrollRunRoutes: FastifyPluginAsync<{
               'SELECT employee_id FROM app.employee_payroll_details WHERE company_id = app.current_company_id() FOR SHARE',
             );
             const inputs = await prepareInputs(tx, run);
-            if (action === 'finalize') {
+            if (action !== 'calculate') {
               if (!body.confirmed)
                 throw new ApiError(
                   400,
@@ -551,7 +564,7 @@ export const payrollRunRoutes: FastifyPluginAsync<{
               if (!run.calculation)
                 throw new ApiError(
                   409,
-                  'Calculate and review payroll before finalizing.',
+                  'Calculate and review payroll before approval.',
                 );
               if (
                 fingerprint(inputs) !==
@@ -561,7 +574,7 @@ export const payrollRunRoutes: FastifyPluginAsync<{
               )
                 throw new ApiError(
                   409,
-                  'Employee details, compensation or tax history changed. Recalculate and review before finalizing.',
+                  'Employee details, compensation or tax history changed. Recalculate and review before approval.',
                 );
               const employer = inputs[0]?.identity.employerDetails;
               if (
@@ -571,7 +584,7 @@ export const payrollRunRoutes: FastifyPluginAsync<{
               ) {
                 throw new ApiError(
                   400,
-                  'Add employer TPIN, NAPSA and NHIMA registrations in Settings, then recalculate before finalizing.',
+                  'Add employer TPIN, NAPSA and NHIMA registrations in Settings, then recalculate before approval.',
                 );
               }
               const incomplete = inputs.filter(
@@ -583,8 +596,10 @@ export const payrollRunRoutes: FastifyPluginAsync<{
               if (incomplete.length)
                 throw new ApiError(
                   400,
-                  `${incomplete.map((i) => i.identity.employeeNumber).join(', ')}: add TPIN, NAPSA and NHIMA identifiers in the employee profile before finalizing.`,
+                  `${incomplete.map((i) => i.identity.employeeNumber).join(', ')}: add TPIN, NAPSA and NHIMA identifiers in the employee profile before approval.`,
                 );
+            }
+            if (action === 'finalize') {
               finalizePayrollRun(
                 run,
                 principal.membershipId,
@@ -592,6 +607,16 @@ export const payrollRunRoutes: FastifyPluginAsync<{
               );
               await tx.query(
                 `UPDATE app.payroll_runs SET status='finalized', finalized_by_membership_id=$2, finalized_at=statement_timestamp(), row_version=row_version+1, updated_at=statement_timestamp() WHERE company_id = app.current_company_id() AND id=$1`,
+                [runId, principal.membershipId],
+              );
+            } else if (action === 'approve') {
+              approvePayrollRun(
+                run,
+                principal.membershipId,
+                new Date().toISOString(),
+              );
+              await tx.query(
+                `UPDATE app.payroll_runs SET status='approved', approved_by_membership_id=$2, approved_at=statement_timestamp(), row_version=row_version+1, updated_at=statement_timestamp() WHERE company_id = app.current_company_id() AND id=$1`,
                 [runId, principal.membershipId],
               );
             } else {
@@ -652,7 +677,13 @@ export const payrollRunRoutes: FastifyPluginAsync<{
               );
             }
             await appendSuccessfulAuditEvent(tx, principal, request.id, {
-              eventType: `payroll.run-${action === 'finalize' ? 'finalized' : 'calculated'}`,
+              eventType: `payroll.run-${
+                action === 'finalize'
+                  ? 'finalized'
+                  : action === 'approve'
+                    ? 'approved'
+                    : 'calculated'
+              }`,
               targetType: 'payroll-run',
               targetId: runId,
             });

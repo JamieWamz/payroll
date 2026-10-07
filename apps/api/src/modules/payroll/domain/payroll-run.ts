@@ -18,7 +18,8 @@ import type { PayrollPeriod, PayrollPeriodId } from './payroll-period.js';
 
 export type PayrollRunId = EntityId<'PayrollRun'>;
 export type MembershipId = EntityId<'CompanyMembership'>;
-export type PayrollRunStatus = 'calculated' | 'draft' | 'finalized';
+export type PayrollRunStatus =
+  'approved' | 'calculated' | 'draft' | 'finalized';
 
 export interface PayrollRunCalculation {
   readonly calculatedAt: Instant;
@@ -36,7 +37,13 @@ export interface PayrollRunFinalization {
   readonly finalizedByMembershipId: MembershipId;
 }
 
+export interface PayrollRunApproval {
+  readonly approvedAt: Instant;
+  readonly approvedByMembershipId: MembershipId;
+}
+
 export interface PayrollRun {
+  readonly approval: Readonly<PayrollRunApproval> | undefined;
   readonly calculation: Readonly<PayrollRunCalculation> | undefined;
   readonly companyId: CompanyId;
   readonly createdAt: Instant;
@@ -76,6 +83,7 @@ export function createDraftPayrollRun(
   const employeeIds = normalizeEmployeeIds(input.employeeIds);
 
   return Object.freeze({
+    approval: undefined,
     calculation: undefined,
     companyId,
     createdAt: parseInstant(input.createdAt),
@@ -102,7 +110,7 @@ export function calculatePayrollRun(
   calculatedByMembershipId: string,
   calculatedAt: string,
 ): Readonly<PayrollRun> {
-  if (run.status === 'finalized') {
+  if (run.status === 'approved' || run.status === 'finalized') {
     throw immutableRun();
   }
 
@@ -129,6 +137,7 @@ export function calculatePayrollRun(
       calculatedByMembershipId: calculatorMembershipId,
       entries: Object.freeze(entries),
     }),
+    approval: undefined,
     finalization: undefined,
     status: 'calculated',
   });
@@ -143,6 +152,7 @@ export function returnPayrollRunToDraft(
 
   return Object.freeze({
     ...run,
+    approval: undefined,
     calculation: undefined,
     finalization: undefined,
     status: 'draft',
@@ -154,8 +164,12 @@ export function finalizePayrollRun(
   finalizedByMembershipId: string,
   finalizedAt: string,
 ): Readonly<PayrollRun> {
-  if (run.status !== 'calculated' || run.calculation === undefined) {
-    throw invalidRun('only_calculated_run_can_be_finalized');
+  if (
+    run.status !== 'approved' ||
+    run.calculation === undefined ||
+    run.approval === undefined
+  ) {
+    throw invalidRun('only_approved_run_can_be_finalized');
   }
 
   const finalization = Object.freeze({
@@ -166,11 +180,34 @@ export function finalizePayrollRun(
     ),
   });
 
-  if (finalization.finalizedAt < run.calculation.calculatedAt) {
-    throw invalidRun('finalized_before_calculation');
+  if (finalization.finalizedAt < run.approval.approvedAt) {
+    throw invalidRun('finalized_before_approval');
   }
 
   return Object.freeze({ ...run, finalization, status: 'finalized' });
+}
+
+export function approvePayrollRun(
+  run: Readonly<PayrollRun>,
+  approvedByMembershipId: string,
+  approvedAt: string,
+): Readonly<PayrollRun> {
+  if (run.status !== 'calculated' || run.calculation === undefined) {
+    throw invalidRun('only_calculated_run_can_be_approved');
+  }
+
+  const approval = Object.freeze({
+    approvedAt: parseInstant(approvedAt),
+    approvedByMembershipId: parseEntityId(
+      approvedByMembershipId,
+      'CompanyMembership',
+    ),
+  });
+  if (approval.approvedAt < run.calculation.calculatedAt) {
+    throw invalidRun('approved_before_calculation');
+  }
+
+  return Object.freeze({ ...run, approval, status: 'approved' });
 }
 
 function assertRunReferences(

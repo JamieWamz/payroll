@@ -6,7 +6,7 @@ export interface Money {
 export interface Run {
   id: string;
   code: string;
-  status: 'draft' | 'calculated' | 'finalized';
+  status: 'draft' | 'calculated' | 'approved' | 'finalized';
   startsOn: string;
   endsOn: string;
   paymentDate: string;
@@ -16,6 +16,7 @@ export interface Run {
   cancelledAt: string | null;
   cancellationReason: string | null;
   calculatedAt: string | null;
+  approvedAt: string | null;
   createdAt: string;
 }
 export interface Outcome {

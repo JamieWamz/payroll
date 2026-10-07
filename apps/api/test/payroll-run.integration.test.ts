@@ -229,11 +229,20 @@ describe.runIf(
     );
   });
 
-  it('supports calculate, review, finalize, and immutable finalized snapshots', async () => {
+  it('supports calculate, approval, finalize, and immutable finalized snapshots', async () => {
     const client = await requireMigrationPool().connect();
     try {
       await client.query('BEGIN');
       await calculateAlphaRun(client);
+      await client.query(
+        `UPDATE app.payroll_runs
+           SET status = 'approved',
+               approved_by_membership_id = $2,
+               approved_at = statement_timestamp(),
+               row_version = row_version + 1
+           WHERE id = $1`,
+        [fixture.runs.alpha, fixture.memberships.alpha],
+      );
       await client.query(
         `UPDATE app.payroll_runs
            SET status = 'finalized',

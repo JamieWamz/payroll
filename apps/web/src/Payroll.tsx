@@ -70,10 +70,14 @@ export function Payroll({
                 {r.cancelledAt
                   ? 'Cancelled'
                   : r.status === 'calculated'
-                    ? 'Ready for review'
-                    : r.status}
+                    ? 'Ready for approval'
+                    : r.status === 'approved'
+                      ? 'Approved'
+                      : r.status}
               </span>,
-              date(r.finalizedAt ?? r.calculatedAt ?? r.createdAt),
+              date(
+                r.finalizedAt ?? r.approvedAt ?? r.calculatedAt ?? r.createdAt,
+              ),
               <button className="text-button" onClick={() => setSelected(r.id)}>
                 {r.status === 'finalized' ? 'View payroll' : 'Review payroll'} →
               </button>,
@@ -239,6 +243,7 @@ function PayrollReview({
   const finalized = data.status === 'finalized';
   const cancelled = !!data.cancelledAt;
   const calculated = data.status === 'calculated' && !cancelled;
+  const approved = data.status === 'approved' && !cancelled;
   const detail = data.employees.find((e) => e.id === employee);
   return (
     <>
@@ -258,18 +263,21 @@ function PayrollReview({
             ? 'Cancelled'
             : finalized
               ? 'Finalized'
-              : calculated
-                ? 'Ready for review'
-                : 'Draft'}
+              : approved
+                ? 'Approved'
+                : calculated
+                  ? 'Ready for approval'
+                  : 'Draft'}
         </span>
       </div>
       <ol className="workflow-steps">
         <li className="done">1. Prepare</li>
-        <li className={calculated || finalized ? 'done' : ''}>
+        <li className={calculated || approved || finalized ? 'done' : ''}>
           2. Calculate & review
         </li>
-        <li className={finalized ? 'done' : ''}>3. Finalize</li>
-        <li>4. Documents & filing</li>
+        <li className={approved || finalized ? 'done' : ''}>3. Approve</li>
+        <li className={finalized ? 'done' : ''}>4. Finalize</li>
+        <li>5. Documents & filing</li>
       </ol>
       {data.status !== 'draft' && (
         <div className="metrics">
@@ -298,7 +306,7 @@ function PayrollReview({
               payroll engine.
             </p>
           </div>
-          {!finalized && !cancelled && (
+          {!finalized && !approved && !cancelled && (
             <ActionButton
               className="primary"
               action={async () => {
@@ -374,11 +382,11 @@ function PayrollReview({
       {calculated && (
         <section className="review-panel">
           <div>
-            <h2>Approve this payroll record</h2>
+            <h2>Approve this payroll for finalization</h2>
             <p>
               Review earnings, deductions, opening tax balances and employee
-              identifiers. Finalization locks these amounts and enables payslips
-              and reports.
+              identifiers. Approval freezes this reviewed calculation; only an
+              approved payroll can be finalized.
             </p>
             <label className="review-confirmation">
               <input
@@ -387,6 +395,37 @@ function PayrollReview({
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
               I have reviewed this payroll and its statutory deductions.
+            </label>
+          </div>
+          <ActionButton
+            disabled={!confirmed}
+            className="primary"
+            action={async () => {
+              await request(`${path}/approve`, {
+                csrf,
+                body: { expectedVersion: data.version, confirmed: true },
+              });
+              setRevision((v) => v + 1);
+            }}
+          >
+            Approve payroll
+          </ActionButton>
+        </section>
+      )}
+      {approved && (
+        <section className="review-panel">
+          <div>
+            <h2>Finalize approved payroll</h2>
+            <p>
+              This locks the approved amounts and enables payslips and reports.
+            </p>
+            <label className="review-confirmation">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+              />
+              I confirm this approved payroll is ready to finalize.
             </label>
           </div>
           <ActionButton
@@ -478,13 +517,25 @@ function PayrollReview({
           </p>
           {navigate && (
             <div className="button-row" style={{ marginTop: '0.75rem' }}>
-              <button type="button" className="secondary" onClick={() => navigate('Bank batches')}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => navigate('Bank batches')}
+              >
                 Bank Batches & Payments →
               </button>
-              <button type="button" className="secondary" onClick={() => navigate('ZRA returns')}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => navigate('ZRA returns')}
+              >
                 ZRA Tax Returns →
               </button>
-              <button type="button" className="secondary" onClick={() => navigate('Reports')}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => navigate('Reports')}
+              >
                 Statutory Reports →
               </button>
             </div>

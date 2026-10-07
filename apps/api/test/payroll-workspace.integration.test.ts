@@ -317,7 +317,7 @@ describe.runIf(url && migrationUrl)(
         }>().items,
       ).toHaveLength(0);
     });
-    it('calculates exact totals, catches missing identifiers and stale review, and finalizes immutable snapshots', async () => {
+    it('calculates exact totals, approves reviewed payroll, and finalizes immutable snapshots', async () => {
       const result = await success('POST', `/payroll-runs/${runId}/calculate`, {
         expectedVersion: 1,
       });
@@ -333,7 +333,7 @@ describe.runIf(url && migrationUrl)(
           employerCost: { amount: '16950.00' },
         },
       });
-      const missing = await call('POST', `/payroll-runs/${runId}/finalize`, {
+      const missing = await call('POST', `/payroll-runs/${runId}/approve`, {
         expectedVersion: 2,
         confirmed: true,
       });
@@ -344,7 +344,7 @@ describe.runIf(url && migrationUrl)(
         details,
       });
       detailsVersion = 1;
-      const stale = await call('POST', `/payroll-runs/${runId}/finalize`, {
+      const stale = await call('POST', `/payroll-runs/${runId}/approve`, {
         expectedVersion: 2,
         confirmed: true,
       });
@@ -353,19 +353,27 @@ describe.runIf(url && migrationUrl)(
       await success('POST', `/payroll-runs/${runId}/calculate`, {
         expectedVersion: 2,
       });
+      const approved = await success('POST', `/payroll-runs/${runId}/approve`, {
+        expectedVersion: 3,
+        confirmed: true,
+      });
+      expect(approved.json()).toMatchObject({
+        status: 'approved',
+        version: 4,
+      });
       const finalized = await success(
         'POST',
         `/payroll-runs/${runId}/finalize`,
-        { expectedVersion: 3, confirmed: true },
+        { expectedVersion: 4, confirmed: true },
       );
       expect(finalized.json()).toMatchObject({
         status: 'finalized',
-        version: 4,
+        version: 5,
       });
       expect(
         (
           await call('POST', `/payroll-runs/${runId}/calculate`, {
-            expectedVersion: 4,
+            expectedVersion: 5,
           })
         ).statusCode,
       ).toBe(409);
@@ -697,7 +705,7 @@ describe.runIf(url && migrationUrl)(
       expect(
         (
           await call('POST', `/payroll-runs/${runId}/finalize`, {
-            expectedVersion: 4,
+            expectedVersion: 5,
             confirmed: true,
           })
         ).statusCode,

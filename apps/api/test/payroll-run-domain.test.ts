@@ -9,6 +9,7 @@ import type {
   RoundingPolicyIdentifier,
 } from '../src/modules/payroll/calculation/types.js';
 import {
+  approvePayrollRun,
   calculatePayrollRun,
   createDraftPayrollRun,
   createPayrollPeriod,
@@ -273,7 +274,7 @@ describe('payroll run lifecycle', () => {
     expect(draft.calculation).toBeUndefined();
   });
 
-  it('finalizes only a calculated run and makes it immutable', () => {
+  it('requires approval before finalization and then makes the run immutable', () => {
     const calculator: PayrollCalculator = { calculate: () => createOutcome() };
     const calculated = calculatePayrollRun(
       createRun(),
@@ -282,8 +283,16 @@ describe('payroll run lifecycle', () => {
       membershipId,
       '2026-09-04T10:10:00.000Z',
     );
-    const finalized = finalizePayrollRun(
+    expect(() =>
+      finalizePayrollRun(calculated, membershipId, '2026-09-04T10:15:00.000Z'),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_PAYROLL_RUN' }));
+    const approved = approvePayrollRun(
       calculated,
+      membershipId,
+      '2026-09-04T10:12:00.000Z',
+    );
+    const finalized = finalizePayrollRun(
+      approved,
       membershipId,
       '2026-09-04T10:15:00.000Z',
     );
@@ -306,7 +315,7 @@ describe('payroll run lifecycle', () => {
     ).toThrowError(expect.objectContaining({ code: 'PAYROLL_RUN_IMMUTABLE' }));
   });
 
-  it('rejects a finalization instant before calculation', () => {
+  it('rejects approval before calculation and finalization before approval', () => {
     const calculator: PayrollCalculator = { calculate: () => createOutcome() };
     const calculated = calculatePayrollRun(
       createRun(),
@@ -317,7 +326,15 @@ describe('payroll run lifecycle', () => {
     );
 
     expect(() =>
-      finalizePayrollRun(calculated, membershipId, '2026-09-04T10:09:59.999Z'),
+      approvePayrollRun(calculated, membershipId, '2026-09-04T10:09:59.999Z'),
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_PAYROLL_RUN' }));
+    const approved = approvePayrollRun(
+      calculated,
+      membershipId,
+      '2026-09-04T10:12:00.000Z',
+    );
+    expect(() =>
+      finalizePayrollRun(approved, membershipId, '2026-09-04T10:11:59.999Z'),
     ).toThrowError(expect.objectContaining({ code: 'INVALID_PAYROLL_RUN' }));
   });
 

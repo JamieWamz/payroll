@@ -52,9 +52,14 @@ export function Dashboard({
     });
   if (latest?.status === 'calculated')
     tasks.push({
-      title: `Review ${latest.code} payroll`,
-      description:
-        'Check calculated earnings and deductions before finalizing.',
+      title: `Approve ${latest.code} payroll`,
+      description: 'Check calculated earnings and deductions before approval.',
+      page: 'Payroll',
+    });
+  if (latest?.status === 'approved')
+    tasks.push({
+      title: `Finalize ${latest.code} payroll`,
+      description: 'The reviewed payroll is approved and ready to lock.',
       page: 'Payroll',
     });
   if (latest?.status === 'finalized')
@@ -104,8 +109,10 @@ export function Dashboard({
             <span className="eyebrow">LATEST PAYROLL</span>
             <span className={`badge ${latest?.status ?? 'draft'}`}>
               {latest?.status === 'calculated'
-                ? 'Ready for review'
-                : (latest?.status ?? 'Not started')}
+                ? 'Ready for approval'
+                : latest?.status === 'approved'
+                  ? 'Approved'
+                  : (latest?.status ?? 'Not started')}
             </span>
           </div>
           <h2>{latest?.code ?? 'Your next payroll starts here'}</h2>
